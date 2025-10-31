@@ -28,7 +28,7 @@ Traditional agriculture AI solutions require farmers to upload sensitive farm da
 │  ├─ Train models locally on device                          │
 │  ├─ Submit encrypted model weights                          │
 │  ├─ Aggregation to generate global model used for inference │
-│  └─ Claim rewards via Lace wallet                          │
+│  └─ Claim rewards via Lace wallet                           │
 │                                                             │
 │  🔗 MIDNIGHT NETWORK (Smart Contract)                       │
 │  ├─ Register aggregators (permissionless)                   │
@@ -45,7 +45,7 @@ Traditional agriculture AI solutions require farmers to upload sensitive farm da
 │  ├─ Accepts farmer SMS queries (any phone)                  │
 │  ├─ Runs inference on latest model                          │
 │  ├─ Returns predictions (rainfall, yield, etc.)             │
-│  └─ Accessible to farmers without tech skills              │
+│  └─ Accessible to farmers without tech skills               │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
