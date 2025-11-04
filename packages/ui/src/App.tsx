@@ -31,7 +31,7 @@ interface Message {
 }
 
 // Context to share state across routes
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, type ReactNode } from 'react';
 
 interface AppContextType {
   wallet: Wallet | null;
@@ -139,17 +139,18 @@ function LoginRoute() {
   const navigate = useNavigate();
 
   /**
-   * Use the real wallet from WalletProvider instead of mock
+   * Use the real Midnight wallet from WalletProvider instead of mock
    * This gives us:
-   * - Real Lace wallet connection
+   * - Real Lace Midnight Preview wallet connection
    * - Wallet installation detection
-   * - Actual wallet address from extension
+   * - Actual Midnight wallet address from extension
+   * - Connection to Midnight devnet with tDUST tokens
    */
   const walletContext = useWallet();
   const {
     isConnected,
     address,
-    isLaceInstalled,
+    isMidnightPreviewInstalled,
     isConnecting,
     error,
     connectWallet,
@@ -178,13 +179,13 @@ function LoginRoute() {
   }, [isConnected, address]);
 
   /**
-   * Pass wallet state and real connect function to Login component
+   * Pass Midnight wallet state and real connect function to Login component
    */
   return (
     <Login
       onConnect={connectWallet}
       isConnecting={isConnecting}
-      isLaceInstalled={isLaceInstalled}
+      isMidnightPreviewInstalled={isMidnightPreviewInstalled}
       error={error}
     />
   );
@@ -313,23 +314,25 @@ function PredictionsRoute() {
 // Screen Components
 
 /**
- * Login Component - Now with real Lace wallet integration!
+ * Login Component - Now with real Lace Midnight Preview wallet integration!
  *
  * Props:
- * - onConnect: Function to connect Lace wallet
- * - isConnecting: Are we currently connecting?
- * - isLaceInstalled: Is Lace extension installed?
+ * - onConnect: Function to connect Lace Midnight Preview wallet
+ * - isConnecting: Are we currently connecting to Midnight devnet?
+ * - isMidnightPreviewInstalled: Is Lace Midnight Preview extension installed?
  * - error: Any error message to display
+ *
+ * IMPORTANT: This connects to Midnight devnet with tDUST tokens, not Cardano!
  */
 function Login({
   onConnect,
   isConnecting = false,
-  isLaceInstalled = true,
+  isMidnightPreviewInstalled = true,
   error = null,
 }: {
   onConnect: () => void;
   isConnecting?: boolean;
-  isLaceInstalled?: boolean;
+  isMidnightPreviewInstalled?: boolean;
   error?: string | null;
 }) {
   return (
@@ -352,28 +355,31 @@ function Login({
             </div>
           )}
 
-          {/* Show "Install Lace" button if not installed */}
-          {!isLaceInstalled ? (
+          {/* Show "Install Midnight Preview" button if not installed */}
+          {!isMidnightPreviewInstalled ? (
             <div className="mb-6">
               <div className="mb-4 p-4 bg-yellow-900/50 border border-yellow-500/50 rounded-lg">
                 <p className="text-yellow-200 text-sm mb-2">
-                  ⚠️ Lace wallet is not installed
+                  ⚠️ Lace Midnight Preview is not installed
+                </p>
+                <p className="text-yellow-100 text-xs mb-2">
+                  You need the Lace Midnight Preview extension for Midnight devnet.
                 </p>
                 <p className="text-yellow-100 text-xs">
-                  You need the Lace browser extension to use EdgeChain.
+                  This is a specialized extension for privacy-preserving DApps with tDUST tokens.
                 </p>
               </div>
               <a
-                href="https://www.lace.io/"
+                href="https://docs.midnight.network/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block w-full bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-700 hover:to-orange-700 text-white font-semibold py-4 px-6 rounded-xl text-center transition-all"
               >
-                Install Lace Wallet →
+                Install Lace Midnight Preview →
               </a>
             </div>
           ) : (
-            /* Show connect button if Lace is installed */
+            /* Show connect button if Midnight Preview is installed */
             <button
               onClick={onConnect}
               disabled={isConnecting}
@@ -382,10 +388,10 @@ function Login({
               {isConnecting ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="animate-spin">⏳</span>
-                  Connecting...
+                  Connecting to Midnight...
                 </span>
               ) : (
-                'Connect Lace Wallet'
+                'Connect Midnight Preview'
               )}
             </button>
           )}
