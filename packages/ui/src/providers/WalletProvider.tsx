@@ -151,13 +151,25 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         );
       }
 
-      // Step 2: Get Lace Midnight Preview API
-      // @ts-ignore - cardano.lace is injected by Lace Midnight Preview extension
-      const lace = window.cardano.lace;
+      // Step 2: Get Lace Midnight Preview API from whichever location it's injected
+      // @ts-ignore
+      let walletContainer = window.cardano?.lace || window.midnight || window.cardano?.midnight;
+
+      if (!walletContainer) {
+        throw new Error('Wallet API not found. Please refresh the page and try again.');
+      }
+
+      // Midnight Preview wraps the actual API in an mLace property
+      // @ts-ignore
+      const walletApi = walletContainer.mLace || walletContainer;
+
+      if (!walletApi || !walletApi.enable) {
+        throw new Error('Wallet API structure not recognized. Please ensure Lace Midnight Preview is properly installed.');
+      }
 
       // Step 3: Request permission to connect
       // This will show a popup in Lace Midnight Preview asking user to approve
-      const isEnabled = await lace.enable();
+      const isEnabled = await walletApi.enable();
 
       if (!isEnabled) {
         throw new Error('User denied wallet connection');
@@ -169,8 +181,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       // Get Midnight wallet addresses
       // Note: Lace Midnight Preview uses same API as regular Lace
-      const usedAddresses = await lace.getUsedAddresses();
-      const unusedAddresses = await lace.getUnusedAddresses();
+      const usedAddresses = await walletApi.getUsedAddresses();
+      const unusedAddresses = await walletApi.getUnusedAddresses();
 
       // Use the first available address
       const addresses = [...usedAddresses, ...unusedAddresses];
@@ -277,9 +289,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!checkMidnightPreviewInstalled()) return;
 
+    // Get wallet API from whichever location it's injected
     // @ts-ignore
-    const lace = window.cardano?.lace;
-    if (!lace) return;
+    const walletApi = window.cardano?.lace || window.midnight || window.cardano?.midnight;
+    if (!walletApi) return;
 
     // Listen for account changes
     const handleAccountChange = (accounts: string[]) => {
@@ -294,16 +307,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // Set up listener (if Lace supports it)
-    // Note: Same event API as regular Lace
-    if (lace.on) {
-      lace.on('accountsChanged', handleAccountChange);
+    // Set up listener (if wallet supports it)
+    if (walletApi.on) {
+      walletApi.on('accountsChanged', handleAccountChange);
     }
 
     // Cleanup listener when component unmounts
     return () => {
-      if (lace.off) {
-        lace.off('accountsChanged', handleAccountChange);
+      if (walletApi.off) {
+        walletApi.off('accountsChanged', handleAccountChange);
       }
     };
   }, []);
