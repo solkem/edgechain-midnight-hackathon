@@ -487,42 +487,64 @@ function Register({ address, onRegister, onSkip }: { address: string; onRegister
                 Detailed
               </button>
             </div>
-            <div className="text-xs text-purple-200">
-              {privacyLevel === 'basic' && '✓ Maximum privacy - Only ZK-proofs shared, generic predictions'}
-              {privacyLevel === 'enhanced' && '✓ Better UX - Basic profile data for personalized experience'}
-              {privacyLevel === 'detailed' && '✓ Best performance - Detailed data improves model accuracy'}
+            <div className="text-xs text-purple-200 space-y-1">
+              {privacyLevel === 'basic' && (
+                <>
+                  <p className="font-semibold">✓ Maximum Privacy - Local-first model</p>
+                  <p className="text-purple-300">Train on your data only. Works offline. Optionally contribute ZK-proofs to help others.</p>
+                </>
+              )}
+              {privacyLevel === 'enhanced' && (
+                <>
+                  <p className="font-semibold">✓ Better Accuracy - Local + Global models</p>
+                  <p className="text-purple-300">Merge your local model with crowd wisdom. Optional profile helps personalization.</p>
+                </>
+              )}
+              {privacyLevel === 'detailed' && (
+                <>
+                  <p className="font-semibold">✓ Best Performance - Cohort learning via ZK-proofs</p>
+                  <p className="text-purple-300">Learn from similar farms without revealing identity. Prove attributes privately.</p>
+                </>
+              )}
             </div>
           </div>
 
-          {/* Basic Fields (always shown) */}
-          {privacyLevel !== 'basic' && (
+          {/* Enhanced Privacy Fields - Optional basic profile */}
+          {privacyLevel === 'enhanced' && (
             <>
-              <input
-                type="text"
-                value={form.name}
-                onChange={e => setForm({...form, name: e.target.value})}
-                placeholder="Farm Name"
-                className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 transition-colors"
-              />
-              <input
-                type="text"
-                value={form.region}
-                onChange={e => setForm({...form, region: e.target.value})}
-                placeholder="Region"
-                className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-purple-500 transition-colors"
-              />
-              <div>
-                <label className="block text-sm text-purple-200 mb-2">Primary Crops</label>
-                <div className="grid grid-cols-2 gap-2">
-                  {crops.map(c => (
-                    <button
-                      key={c}
-                      onClick={() => toggleCrop(c)}
-                      className={`px-3 py-2 rounded-lg text-sm transition-all ${form.crops.includes(c) ? 'bg-purple-600 text-white' : 'bg-slate-700/50 text-gray-300 hover:bg-slate-700'}`}
-                    >
-                      {c}
-                    </button>
-                  ))}
+              <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4">
+                <h4 className="text-sm text-yellow-300 mb-3 flex items-center gap-2">
+                  <span>📝</span> Optional: Basic Profile (helps personalization)
+                </h4>
+                <div className="space-y-3">
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={e => setForm({...form, name: e.target.value})}
+                    placeholder="Farm Name (optional)"
+                    className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
+                  />
+                  <input
+                    type="text"
+                    value={form.region}
+                    onChange={e => setForm({...form, region: e.target.value})}
+                    placeholder="Region (optional)"
+                    className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 transition-colors"
+                  />
+                  <div>
+                    <label className="block text-sm text-yellow-200 mb-2">Primary Crops (optional)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {crops.map(c => (
+                        <button
+                          key={c}
+                          onClick={() => toggleCrop(c)}
+                          className={`px-3 py-2 rounded-lg text-sm transition-all ${form.crops.includes(c) ? 'bg-yellow-600 text-white' : 'bg-slate-700/50 text-gray-300 hover:bg-slate-700'}`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </>
@@ -531,9 +553,46 @@ function Register({ address, onRegister, onSkip }: { address: string; onRegister
           {/* Detailed Fields (only for detailed privacy level) */}
           {privacyLevel === 'detailed' && (
             <>
-              <div className="border-t border-purple-500/30 pt-4">
-                <h4 className="text-sm text-purple-300 mb-3">📊 Optional: Model Optimization Data</h4>
-                <div className="grid grid-cols-2 gap-3">
+              <div className="bg-orange-900/20 border border-orange-500/30 rounded-lg p-4">
+                <h4 className="text-sm text-orange-300 mb-3 flex items-center gap-2">
+                  <span>📝</span> Optional: Basic Profile
+                </h4>
+                <div className="space-y-3 mb-4">
+                  <input
+                    type="text"
+                    value={form.name}
+                    onChange={e => setForm({...form, name: e.target.value})}
+                    placeholder="Farm Name (optional)"
+                    className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 transition-colors"
+                  />
+                  <input
+                    type="text"
+                    value={form.region}
+                    onChange={e => setForm({...form, region: e.target.value})}
+                    placeholder="Region (optional)"
+                    className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-orange-500 transition-colors"
+                  />
+                  <div>
+                    <label className="block text-sm text-orange-200 mb-2">Primary Crops (optional)</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {crops.map(c => (
+                        <button
+                          key={c}
+                          onClick={() => toggleCrop(c)}
+                          className={`px-3 py-2 rounded-lg text-sm transition-all ${form.crops.includes(c) ? 'bg-orange-600 text-white' : 'bg-slate-700/50 text-gray-300 hover:bg-slate-700'}`}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-orange-500/30 pt-4">
+                  <h4 className="text-sm text-orange-300 mb-3 flex items-center gap-2">
+                    <span>📊</span> Optional: Farming Details (enables cohort learning)
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs text-purple-200 mb-1">Farm Size</label>
                     <select
@@ -582,6 +641,7 @@ function Register({ address, onRegister, onSkip }: { address: string; onRegister
                   </div>
                 </div>
               </div>
+              </div>
             </>
           )}
 
@@ -589,8 +649,7 @@ function Register({ address, onRegister, onSkip }: { address: string; onRegister
             <button onClick={onSkip} className="flex-1 bg-slate-700/50 hover:bg-slate-700 text-white font-semibold py-3 rounded-lg transition-all">Skip</button>
             <button
               onClick={() => onRegister({...form, privacyLevel})}
-              disabled={privacyLevel !== 'basic' && (!form.name || !form.region || !form.crops.length)}
-              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 rounded-lg hover:opacity-90 transition-all"
             >
               Create
             </button>

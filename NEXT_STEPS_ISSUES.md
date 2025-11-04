@@ -4,7 +4,7 @@ This document contains 5 prioritized issues for completing the EdgeChain impleme
 
 ---
 
-## Issue #1: Integrate Lace Wallet Connection
+## Issue #2: Integrate Lace Wallet Connection
 
 **Priority**: High
 **Labels**: `frontend`, `wallet`, `integration`, `blockchain`
@@ -75,7 +75,7 @@ Replace the mock wallet connection in the UI with real Lace wallet integration f
 
 ---
 
-## Issue #2: Connect to Midnight Smart Contracts
+## Issue #3: Connect to Midnight Smart Contracts
 
 **Priority**: High
 **Labels**: `smart-contracts`, `backend`, `blockchain`, `integration`
@@ -179,7 +179,7 @@ Replace simulated calls in `packages/ui/src/App.tsx`:
 
 ---
 
-## Issue #3: Implement Actual ML Training Logic
+## Issue #4: Implement Actual ML Training Logic
 
 **Priority**: Medium
 **Labels**: `machine-learning`, `federated-learning`, `backend`
@@ -522,7 +522,7 @@ JWT_SECRET=...
 
 ---
 
-## Issue #5: Deploy SMS Bot Infrastructure
+## Issue #6: Deploy SMS Bot Infrastructure
 
 **Priority**: Medium
 **Labels**: `sms`, `infrastructure`, `bot`, `deployment`
