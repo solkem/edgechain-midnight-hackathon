@@ -93,8 +93,15 @@ export default function EdgeChainApp() {
   };
 
   const disconnect = () => {
+    // Clear app state
     setWallet(null);
     setFarmer(null);
+
+    // Clear farmer profile from localStorage
+    // Note: wallet disconnection (midnightAddress, midnightNetwork) is handled by WalletProvider
+    if (wallet?.address) {
+      localStorage.removeItem(`farmer_${wallet.address}`);
+    }
   };
 
   const contextValue: AppContextType = {
@@ -154,6 +161,7 @@ function LoginRoute() {
     isConnecting,
     error,
     connectWallet,
+    disconnectWallet,
   } = walletContext;
 
   /**
@@ -229,6 +237,7 @@ function RegisterRoute() {
 
 function SelectionRoute() {
   const { farmer, disconnect } = useAppContext();
+  const { disconnectWallet } = useWallet();
   const navigate = useNavigate();
 
   if (!farmer) {
@@ -242,6 +251,7 @@ function SelectionRoute() {
       onAI={() => navigate('/predictions')}
       onDisconnect={() => {
         disconnect();
+        disconnectWallet();
         navigate('/');
       }}
     />
@@ -250,6 +260,7 @@ function SelectionRoute() {
 
 function TrainRoute() {
   const { farmer, wallet, round, version, submissions, submitUpdate, disconnect } = useAppContext();
+  const { disconnectWallet } = useWallet();
   const navigate = useNavigate();
 
   if (!farmer || !wallet) {
@@ -268,6 +279,7 @@ function TrainRoute() {
       onAI={() => navigate('/predictions')}
       onDisconnect={() => {
         disconnect();
+        disconnectWallet();
         navigate('/');
       }}
     />
@@ -293,6 +305,7 @@ function AggregationRoute() {
 
 function PredictionsRoute() {
   const { farmer, disconnect } = useAppContext();
+  const { disconnectWallet } = useWallet();
   const navigate = useNavigate();
 
   if (!farmer) {
@@ -305,6 +318,7 @@ function PredictionsRoute() {
       onFL={() => navigate('/train')}
       onDisconnect={() => {
         disconnect();
+        disconnectWallet();
         navigate('/');
       }}
     />
