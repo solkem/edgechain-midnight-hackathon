@@ -115,12 +115,20 @@ git push origin main
    - Aggregation endpoints won't be available
    - Model submission will use demo mode
 
-2. **Contract Deployment Requires Wallet**
-   - Users can connect Lace wallet
-   - Contract deployment requires actual Midnight devnet access
+2. **Wallet Connection Restrictions** ⚠️ **IMPORTANT**
+   - Lace Midnight Preview extension has strict security policies
+   - The extension may not inject into `github.io` domains due to browser extension permissions
+   - **Wallet connection works on**: localhost, custom domains with proper configuration
+   - **Wallet connection may fail on**: GitHub Pages (github.io subdomain)
+   - **Workaround**: Users can still see the UI, train models locally (works without wallet!)
+   - **For full wallet demo**: Deploy to custom domain or run locally
+
+3. **Contract Deployment Requires Wallet**
+   - Contract deployment requires Lace Midnight Preview connection
+   - Without wallet access, users see deployment instructions (intentional UX)
    - For demo purposes, the app shows deployment instructions
 
-3. **Environment Variables**
+4. **Environment Variables**
    - `VITE_CONTRACT_ADDRESS` won't be set (no .env file on GitHub Pages)
    - App will show "contract not deployed" banner
    - This is intentional - guides users through deployment
