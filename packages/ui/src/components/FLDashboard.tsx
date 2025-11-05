@@ -9,8 +9,9 @@
  * 5. Make predictions
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useWallet } from '../providers/WalletProvider';
+import { useContract } from '../providers/ContractProvider';
 import type {
   FarmDataset,
   TrainingResult,
@@ -20,12 +21,14 @@ import type {
 } from '../fl/types';
 import { trainLocalModel, DEFAULT_TRAINING_CONFIG } from '../fl/training';
 import { generateMockFarmDataset } from '../fl/dataCollection';
-import { loadGlobalModel, saveGlobalModel } from '../fl/aggregation';
+import { loadGlobalModel, saveGlobalModel } from '../fl/aggregation'; // saveGlobalModel used in download function
 import { hashModelWeights } from '../fl/training';
 import type { TransactionData } from '../providers/WalletProvider';
 
 export function FLDashboard() {
-  const { walletState, signTransaction } = useWallet();
+  const wallet = useWallet();
+  const { signTransaction } = wallet;
+  const contract = useContract();
   const [flState, setFlState] = useState<{
     currentRound: number;
     currentVersion: number;
@@ -71,7 +74,7 @@ export function FLDashboard() {
    * Step 1: Train local model on farmer's data
    */
   const handleTrainModel = async () => {
-    if (!walletState.isConnected) {
+    if (!wallet.isConnected) {
       setError('Please connect your Midnight wallet first');
       return;
     }
@@ -85,7 +88,7 @@ export function FLDashboard() {
 
       // Generate mock farm dataset (in production: use real IoT data)
       const dataset: FarmDataset = generateMockFarmDataset(
-        walletState.address || 'unknown',
+        wallet.address || 'unknown',
         30 // 30 seasons of historical data
       );
 
@@ -125,7 +128,7 @@ export function FLDashboard() {
    * Step 2: Submit trained model to FL aggregator with Midnight signature
    */
   const handleSubmitModel = async () => {
-    if (!walletState.isConnected) {
+    if (!wallet.isConnected) {
       setError('Please connect your Midnight wallet first');
       return;
     }
@@ -148,7 +151,7 @@ export function FLDashboard() {
 
       // Create submission data
       const submission: ModelSubmission = {
-        farmerId: walletState.address || 'unknown',
+        farmerId: wallet.address || 'unknown',
         modelWeights: training.modelWeights,
         weightsHash,
         metrics: {
@@ -185,17 +188,34 @@ export function FLDashboard() {
 
       console.log('✅ Transaction signed:', signedTx);
 
-      // In production: Submit to FL aggregation service
-      // await fetch('/api/fl/submit', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(submission),
-      // });
+      // Submit to FL aggregation service (backend)
+      console.log('📡 Submitting to aggregation server...');
+      const response = await fetch('http://localhost:3001/api/fl/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submission),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Submission failed');
+      }
+
+      const result = await response.json();
+      console.log('🎉 Submission response:', result);
 
       setFlState((prev) => ({
         ...prev,
         lastSubmission: submission,
+        currentVersion: result.globalModelVersion || prev.currentVersion,
       }));
+
+      // If aggregation happened, notify user
+      if (result.aggregated) {
+        console.log('🌐 Global model was aggregated! You can now download it.');
+      } else {
+        console.log(`📊 Submission ${result.submissionCount} received, waiting for more farmers...`);
+      }
 
       console.log('✅ Model submitted successfully!');
     } catch (err: any) {
@@ -209,21 +229,36 @@ export function FLDashboard() {
   /**
    * Step 3: Download latest global model
    */
-  const handleDownloadGlobalModel = () => {
-    const model = loadGlobalModel();
+  const handleDownloadGlobalModel = async () => {
+    try {
+      console.log('📥 Downloading global model from server...');
 
-    if (!model) {
-      setError('No global model available yet. Wait for aggregation or train locally.');
-      return;
+      const response = await fetch('http://localhost:3001/api/fl/global-model');
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        setError(errorData.message || 'No global model available yet');
+        return;
+      }
+
+      const model = await response.json();
+
+      // Save to local storage for inference
+      saveGlobalModel(model);
+
+      setFlState((prev) => ({
+        ...prev,
+        globalModel: model,
+        currentVersion: model.version,
+      }));
+
+      console.log(`✅ Downloaded global model v${model.version}`);
+      console.log(`👨‍🌾 Trained by ${model.metadata.trainedBy} farmers`);
+      console.log(`📊 ${model.metadata.totalSamples} total samples`);
+    } catch (err: any) {
+      console.error('Download failed:', err);
+      setError(`Download failed: ${err.message}`);
     }
-
-    setFlState((prev) => ({
-      ...prev,
-      globalModel: model,
-      currentVersion: model.version,
-    }));
-
-    console.log(`✅ Downloaded global model v${model.version}`);
   };
 
   return (
@@ -238,8 +273,88 @@ export function FLDashboard() {
         </p>
       </div>
 
+      {/* Contract Deployment Status */}
+      {!contract.isDeployed && (
+        <div className="bg-blue-900/30 border border-blue-500/50 rounded-lg p-6 space-y-4">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="text-blue-400 text-3xl">📦</span>
+            <div>
+              <p className="text-blue-300 font-bold text-lg">Contract Deployment Required</p>
+              <p className="text-blue-200 text-sm">
+                The EdgeChain smart contract needs to be deployed to Midnight devnet before you can participate in federated learning
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-black/30 rounded-lg p-4 space-y-3">
+            <h4 className="text-white font-semibold mb-2">📋 Deployment Steps:</h4>
+
+            <div className="space-y-2 text-sm">
+              <div className="flex items-start gap-2">
+                <span className="text-green-400 mt-0.5">✅</span>
+                <span className="text-gray-300">
+                  <strong className="text-white">Step 1:</strong> Install Lace Midnight Preview wallet
+                  <br />
+                  <a
+                    href="https://chromewebstore.google.com/detail/lace-midnight-preview/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:underline ml-6"
+                  >
+                    → Download from Chrome Web Store
+                  </a>
+                </span>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <span className="text-yellow-400 mt-0.5">⏳</span>
+                <span className="text-gray-300">
+                  <strong className="text-white">Step 2:</strong> Get tDUST test tokens
+                  <br />
+                  <a
+                    href="https://faucet.devnet.midnight.network"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:underline ml-6"
+                  >
+                    → Visit Midnight Faucet
+                  </a>
+                  <span className="text-gray-400 ml-2">(Paste your wallet address)</span>
+                </span>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <span className="text-yellow-400 mt-0.5">⏳</span>
+                <span className="text-gray-300">
+                  <strong className="text-white">Step 3:</strong> Deploy contract via CLI
+                  <br />
+                  <code className="bg-gray-800 px-2 py-1 rounded text-xs ml-6 inline-block mt-1">
+                    cd packages/contract && yarn deploy
+                  </code>
+                </span>
+              </div>
+
+              <div className="flex items-start gap-2">
+                <span className="text-yellow-400 mt-0.5">⏳</span>
+                <span className="text-gray-300">
+                  <strong className="text-white">Step 4:</strong> Save contract address to .env
+                  <br />
+                  <code className="bg-gray-800 px-2 py-1 rounded text-xs ml-6 inline-block mt-1">
+                    VITE_CONTRACT_ADDRESS=your_address_here
+                  </code>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <span className="text-gray-400 text-sm">💡 For development, the FL system currently works in demo mode using HTTP. Contract integration is the next step for production.</span>
+          </div>
+        </div>
+      )}
+
       {/* Wallet Status */}
-      {!walletState.isConnected && (
+      {!wallet.isConnected && (
         <div className="bg-yellow-900/30 border border-yellow-500/50 rounded-lg p-4">
           <div className="flex items-center gap-3">
             <span className="text-yellow-400 text-2xl">⚠️</span>
@@ -293,7 +408,7 @@ export function FLDashboard() {
           </div>
           <button
             onClick={handleTrainModel}
-            disabled={flState.isTraining || !walletState.isConnected}
+            disabled={flState.isTraining || !wallet.isConnected}
             className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-pink-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {flState.isTraining ? '⏳ Training...' : '🚀 Train Model'}
@@ -391,7 +506,7 @@ export function FLDashboard() {
           </div>
           <button
             onClick={handleSubmitModel}
-            disabled={submitting || !flState.lastTraining || !walletState.isConnected}
+            disabled={submitting || !flState.lastTraining || !wallet.isConnected}
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? '⏳ Submitting...' : '📤 Submit Model'}

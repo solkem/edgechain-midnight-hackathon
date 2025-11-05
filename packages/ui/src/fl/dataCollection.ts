@@ -627,3 +627,103 @@ export function calculateDatasetStats(dataset: FarmDataset) {
     },
   };
 }
+
+// ============================================================================
+// MOCK DATA GENERATION (for demo/testing)
+// ============================================================================
+
+/**
+ * Generate mock farm dataset for demo purposes
+ * In production, this would come from real IoT sensors
+ *
+ * @param farmerId - Midnight wallet address
+ * @param numSeasons - Number of seasons of historical data
+ * @param region - Geographic region for realistic data ('kenya' | 'california' | 'india')
+ */
+export function generateMockFarmDataset(
+  farmerId: string,
+  numSeasons: number,
+  region: 'kenya' | 'california' | 'india' = 'kenya'
+): FarmDataset {
+  const dataPoints: FarmDataPoint[] = [];
+  const startDate = Date.now() - (numSeasons * 120 * 24 * 60 * 60 * 1000); // ~120 days per season
+
+  // Region-specific parameters
+  const regionParams = {
+    kenya: {
+      rainfall: { base: 600, variance: 300 },
+      temperature: { base: 24, variance: 4 },
+      soilTypes: ['loamy', 'clay', 'sandy'] as const,
+      irrigationTypes: ['rainfed', 'drip'] as const,
+      cropType: 'wheat',
+      yieldMultiplier: 1.0,
+    },
+    california: {
+      rainfall: { base: 450, variance: 200 },
+      temperature: { base: 20, variance: 6 },
+      soilTypes: ['loamy', 'sandy'] as const,
+      irrigationTypes: ['drip', 'sprinkler'] as const,
+      cropType: 'wheat',
+      yieldMultiplier: 1.2, // Better yields due to tech/infrastructure
+    },
+    india: {
+      rainfall: { base: 800, variance: 400 },
+      temperature: { base: 28, variance: 5 },
+      soilTypes: ['clay', 'loamy', 'silty'] as const,
+      irrigationTypes: ['flood', 'rainfed'] as const,
+      cropType: 'wheat',
+      yieldMultiplier: 0.9,
+    },
+  };
+
+  const params = regionParams[region];
+
+  for (let i = 0; i < numSeasons; i++) {
+    const rainfall = params.rainfall.base + (Math.random() - 0.5) * params.rainfall.variance;
+    const temperature = params.temperature.base + (Math.random() - 0.5) * params.temperature.variance;
+    const farmSize = 5 + Math.random() * 15; // 5-20 hectares
+    const fertilizer = 100 + Math.random() * 200;
+    const pesticides = Math.floor(Math.random() * 8) + 2;
+
+    // Simple yield model: f(rainfall, temp, fertilizer, ...)
+    const baseYield = 3.5;
+    const rainfallFactor = Math.max(0, 1 - Math.abs(rainfall - 650) / 1000);
+    const tempFactor = Math.max(0, 1 - Math.abs(temperature - 22) / 20);
+    const fertilizerFactor = Math.min(1.5, fertilizer / 200);
+    const randomNoise = 0.9 + Math.random() * 0.2;
+
+    const yield_value =
+      baseYield *
+      rainfallFactor *
+      tempFactor *
+      fertilizerFactor *
+      params.yieldMultiplier *
+      randomNoise;
+
+    dataPoints.push({
+      rainfall,
+      temperature,
+      soilType: params.soilTypes[Math.floor(Math.random() * params.soilTypes.length)],
+      irrigationType: params.irrigationTypes[Math.floor(Math.random() * params.irrigationTypes.length)],
+      farmSize,
+      fertilizer,
+      pesticides,
+      yield: yield_value,
+      cropType: params.cropType,
+      season: `2024-season-${i + 1}`,
+      timestamp: startDate + (i * 120 * 24 * 60 * 60 * 1000),
+    });
+  }
+
+  return {
+    farmerId,
+    dataPoints,
+    privacyLevel: 'basic',
+    totalSamples: numSeasons,
+    crops: [params.cropType],
+    dateRange: {
+      start: startDate,
+      end: Date.now(),
+    },
+  };
+}
