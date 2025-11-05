@@ -10,27 +10,7 @@ EdgeChain is a decentralized federated learning platform that brings AI-powered 
 
 **Implementation Progress**: 60% Complete
 
-✅ **Completed**:
-- Midnight smart contract (Compact) - compiled successfully
-- Federated learning algorithm (FedAvg) - working
-- Local model training (TensorFlow.js) - browser-based
-- Frontend UI with wallet integration (Lace Midnight Preview)
-- Contract provider architecture (React Context)
-- Aggregation backend (Node.js/Express)
 
-⚠️ **In Progress**:
-- Midnight.js SDK integration (contract deployment pending)
-- ZK-proof generation in frontend
-- Backend contract event watching
-
-📋 **Next Steps**:
-- Deploy contract to Midnight devnet
-- Replace HTTP calls with contract circuits
-- End-to-end testing with 2 farmers
-
-**Time Remaining**: 12 days | **Confidence**: High (85%)
-
-📄 See detailed status: [`MIDNIGHT_INTEGRATION_STATUS.md`](MIDNIGHT_INTEGRATION_STATUS.md)
 
 ---
 
