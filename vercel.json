@@ -1,8 +1,8 @@
 {
   "version": 2,
   "name": "edgechain-midnight",
-  "buildCommand": "ls -la && ls -la packages/ && cd packages/ui && cp package.vercel.json package.json && npm install && npm run build",
-  "outputDirectory": "packages/ui/dist",
+  "buildCommand": "cp package.vercel.json package.json && npm install && npm run build",
+  "outputDirectory": "dist",
   "installCommand": "echo 'Skipping root install - handled in build script'",
   "framework": null,
   "rewrites": [
