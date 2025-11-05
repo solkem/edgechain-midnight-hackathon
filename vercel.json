@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "edgechain-midnight",
-  "buildCommand": "bash build-vercel.sh",
+  "buildCommand": "bash ./build-vercel.sh",
   "outputDirectory": "packages/ui/dist",
   "installCommand": "echo 'Skipping root install - handled in build script'",
   "framework": null,
