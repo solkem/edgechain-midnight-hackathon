@@ -1,7 +1,7 @@
 # fly.toml app configuration file
 # EdgeChain UI - Frontend Application
 
-app = 'edgechain-ui'
+app = 'edgechain-midnight-ui'
 primary_region = 'iad'
 
 [build]

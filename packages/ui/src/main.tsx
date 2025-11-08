@@ -1,11 +1,14 @@
+// IMPORTANT: Import globals first to set up polyfills before any other code runs
+import './globals';
+
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 // Import providers
 import { WalletProvider } from './providers/WalletProvider';
-// ContractProvider import disabled - causes Vite WASM bundling error
-// import { ContractProvider } from './providers/ContractProvider';
+// ContractProvider - now uses DApp Connector API (no direct runtime imports!)
+import { ContractProvider } from './providers/ContractProvider';
 
 // Get the root element
 const rootElement = document.getElementById('root');
@@ -21,7 +24,7 @@ if (!rootElement) {
  *   ↓
  * WalletProvider → Provides Midnight wallet connection
  *   ↓
- * ContractProvider → Provides EdgeChain smart contract access
+ * ContractProvider → Provides EdgeChain smart contract access (via DApp Connector API)
  *   ↓
  * App → Your main application
  *
@@ -32,10 +35,9 @@ if (!rootElement) {
 ReactDOM.createRoot(rootElement).render(
   <StrictMode>
     <WalletProvider>
-      {/* ContractProvider disabled - causes Vite WASM bundling error */}
-      {/* <ContractProvider> */}
+      <ContractProvider>
         <App />
-      {/* </ContractProvider> */}
+      </ContractProvider>
     </WalletProvider>
   </StrictMode>
 );

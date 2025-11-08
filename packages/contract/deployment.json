@@ -1,0 +1,8 @@
+{
+  "contractAddress": "02002f44e466b8c8a1422e269156a6bb4e098cde1007203adf7181eb6659211dbe39",
+  "deployedAt": "2025-11-08T19:42:27.511Z",
+  "network": "testnet",
+  "deploymentWalletAddress": "mn_shield-addr_test1qy0urnfdffs3pyp5308ql3lr4jjl69tr2knwlsxw9l97aa44je8qxqxqmvs3l3xqpcs0prenazr72rkw9upqasu9l378dcsg3kl50g4cey903x4e",
+  "deploymentWalletSeed": "4c03e1497dbee12cdc2ad1db73c3b0679de5475cf78a896c9a8b48b27950f33d",
+  "note": "This wallet was used for deployment only. Use your Lace wallet for UI interaction."
+}

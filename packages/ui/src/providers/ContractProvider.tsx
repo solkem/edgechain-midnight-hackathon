@@ -1,19 +1,35 @@
 /**
- * ContractProvider.tsx - V2 with Real Midnight Integration
+ * ContractProvider.tsx - V3 with DApp Connector API
  *
  * Provides access to the EdgeChain FL Smart Contract on Midnight Network.
- * Handles contract initialization, circuit calls, and ledger state queries.
+ * Uses DApp Connector API for all contract interactions (no direct runtime imports).
  *
- * This version includes proper Midnight.js integration with fallback to simulation mode.
+ * Architecture:
+ * - Browser: UI, TensorFlow.js training, submit transactions via DApp Connector
+ * - Midnight Blockchain: Contract runtime, execute circuits, store state
+ *
+ * See: private-docs/ARCHITECTURE_REFACTOR.md
  */
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useWallet } from './WalletProvider';
 import type { DAppConnectorAPI } from '@midnight-ntwrk/dapp-connector-api';
 
-// Import the compiled Midnight contract
-import * as EdgeChainContract from '@edgechain/contract/dist/managed/edgechain/contract/index.cjs';
-import type { Contract, Ledger } from '@edgechain/contract/dist/managed/edgechain/contract/index.cjs';
+// ✅ NO direct contract runtime imports - those break Vite bundling!
+// Contract execution happens on Midnight blockchain, not in browser.
+// We only need type definitions for our ledger state.
+
+/**
+ * Ledger State Type
+ * Represents the public state of our EdgeChain FL contract
+ */
+interface Ledger {
+  currentRound: bigint;
+  currentModelVersion: bigint;
+  submissionCount: bigint;
+  globalModelHash: Uint8Array;
+  isAggregating: boolean;
+}
 
 // Declare global window type for Midnight API
 declare global {
@@ -33,8 +49,8 @@ declare global {
  * Contract state and functions
  */
 interface ContractContextType {
-  // Contract instance
-  contract: Contract<any> | null;
+  // DApp Connector API instance
+  connector: DAppConnectorAPI | null;
 
   // Current ledger state
   ledger: Ledger | null;
@@ -90,7 +106,7 @@ export function useContract() {
  */
 export function ContractProvider({ children }: { children: ReactNode }) {
   const wallet = useWallet();
-  const [contract, setContract] = useState<Contract<any> | null>(null);
+  const [connector, setConnector] = useState<DAppConnectorAPI | null>(null);
   const [ledger, setLedger] = useState<Ledger | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isDeployed, setIsDeployed] = useState(false);
@@ -117,7 +133,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
    */
   useEffect(() => {
     if (!wallet.isConnected) {
-      setContract(null);
+      setConnector(null);
       setLedger(null);
       setIsInitialized(false);
       return;
@@ -173,29 +189,18 @@ export function ContractProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Step 3: Try to initialize real contract
+      // Step 3: Store connector and initialize ledger state
       try {
-        const {
-          getMidnightConfig,
-          createMidnightProviders,
-          initializeEdgeChainContract,
-        } = await import('../lib/midnight');
-
-        const config = getMidnightConfig();
-        console.log('📡 Connecting to Midnight Network:', config.indexerUrl);
-
-        const providers = await createMidnightProviders(api, config);
-        const contractInstance = await initializeEdgeChainContract(providers, contractAddress);
-
-        setContract(contractInstance as any);
+        setConnector(api);
         setSimulationMode(false);
-        console.log('✅ EdgeChain contract initialized (real mode)');
+        console.log('✅ DApp Connector ready (real mode)');
 
+        // Initialize ledger state by querying public data
         await refreshLedger();
         setIsInitialized(true);
         setError(null);
       } catch (providerError: any) {
-        console.error('⚠️  Provider initialization failed:', providerError);
+        console.error('⚠️  Connector initialization failed:', providerError);
         console.warn('   Falling back to simulation mode');
         setSimulationMode(true);
         await initializeSimulationMode();
@@ -297,7 +302,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
       console.log(`   Dataset size: ${datasetSize}`);
       console.log(`   Accuracy: ${(accuracy * 100).toFixed(2)}%`);
 
-      if (simulationMode || !contract) {
+      if (simulationMode || !connector) {
         // Simulation mode
         console.log('🎭 Simulating submitModel circuit...');
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -316,14 +321,37 @@ export function ContractProvider({ children }: { children: ReactNode }) {
         return true;
       }
 
-      // Real contract call
-      const witnesses = {}; // ZK witnesses would go here
-      const context = {
-        // Circuit context setup
-      };
+      // Real contract call via DApp Connector API
+      // NOTE: The actual implementation depends on whether we:
+      // 1. Import contract instance and use connector.callTx.methodName()
+      // 2. Use pure connector API without contract imports
+      //
+      // For now, we'll use a placeholder that documents the intended flow.
+      // This will be updated once we have the contract compiled and can
+      // import it without breaking Vite (using the new architecture).
 
-      const result = await contract.circuits.submitModel(context as any);
-      console.log('✅ Model submitted to contract');
+      if (!contractAddress) {
+        throw new Error('Contract address not set');
+      }
+
+      // TODO: Implement actual circuit call using one of these patterns:
+      // Pattern 1 (if contract instance available):
+      //   const contract = new EdgeChainContract.Contract(witnesses);
+      //   const result = await contract.callTx.submitModel();
+      //   await connector.submitTransaction(result);
+      //
+      // Pattern 2 (pure connector API, if supported):
+      //   const result = await connector.callCircuit({
+      //     contractAddress,
+      //     method: 'submitModel',
+      //     args: { modelWeightHash, datasetSize, accuracy }
+      //   });
+
+      console.warn('⚠️  Real contract calls not yet implemented');
+      console.warn('   Using simulation mode for now');
+      console.warn('   See private-docs/ARCHITECTURE_REFACTOR.md for next steps');
+
+      throw new Error('Real contract integration pending - use simulation mode');
 
       await refreshLedger();
       return true;
@@ -351,7 +379,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
       console.log('🌐 Completing aggregation...');
       console.log(`   New model hash: ${Array.from(newModelHash.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join('')}...`);
 
-      if (simulationMode || !contract) {
+      if (simulationMode || !connector) {
         // Simulation mode
         console.log('🎭 Simulating completeAggregation circuit...');
         await new Promise(resolve => setTimeout(resolve, 1500));
@@ -372,14 +400,10 @@ export function ContractProvider({ children }: { children: ReactNode }) {
         return true;
       }
 
-      // Real contract call
-      const witnesses = {}; // ZK witnesses would go here
-      const context = {
-        // Circuit context setup
-      };
-
-      const result = await contract.circuits.completeAggregation(context as any);
-      console.log('✅ Aggregation completed on-chain');
+      // Real contract call via DApp Connector API
+      // TODO: Implement when contract is ready
+      console.warn('⚠️  Real contract calls not yet implemented');
+      throw new Error('Real contract integration pending - use simulation mode');
 
       await refreshLedger();
       return true;
@@ -401,14 +425,14 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      if (simulationMode || !contract) {
+      if (simulationMode || !connector) {
         return ledger?.globalModelHash || new Uint8Array(32);
       }
 
-      const context = {};
-      const result = await contract.circuits.getGlobalModelHash(context as any);
-      // Note: Actual return value parsing depends on Midnight.js SDK structure
-      return new Uint8Array(32); // Placeholder
+      // TODO: Query public ledger state via indexer
+      // Real implementation would use public data provider to query ledger
+      console.warn('⚠️  Real ledger queries not yet implemented');
+      return ledger?.globalModelHash || new Uint8Array(32);
     } catch (err: any) {
       console.error('Get global model hash error:', err);
       throw err;
@@ -424,14 +448,13 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      if (simulationMode || !contract) {
+      if (simulationMode || !connector) {
         return ledger?.isAggregating || false;
       }
 
-      const context = {};
-      const result = await contract.circuits.checkAggregating(context as any);
-      // Note: Actual return value parsing depends on Midnight.js SDK structure
-      return false; // Placeholder
+      // TODO: Query public ledger state via indexer
+      console.warn('⚠️  Real ledger queries not yet implemented');
+      return ledger?.isAggregating || false;
     } catch (err: any) {
       console.error('Check aggregating error:', err);
       return false;
@@ -449,20 +472,23 @@ export function ContractProvider({ children }: { children: ReactNode }) {
     try {
       console.log('🔄 Refreshing ledger state...');
 
-      if (simulationMode || !contract) {
+      if (simulationMode || !connector) {
         // Already have mock ledger in simulation mode
         console.log('✅ Ledger refreshed (simulation)');
         return;
       }
 
-      // Real contract query
-      // Note: Actual ledger query depends on Midnight.js SDK structure
-      // Typically something like:
-      // const state = await contract.getState();
-      // const parsedLedger = parseLedger(state);
-      // setLedger(parsedLedger);
+      // TODO: Real ledger query via public data provider
+      // Implementation would use indexer-public-data-provider to query
+      // the contract's public ledger state from the Midnight blockchain
+      //
+      // Example pattern:
+      // const publicDataProvider = await createPublicDataProvider(config);
+      // const ledgerState = await publicDataProvider.queryLedger(contractAddress);
+      // setLedger(parseLedgerState(ledgerState));
 
-      console.log('✅ Ledger refreshed');
+      console.warn('⚠️  Real ledger queries not yet implemented');
+      console.log('✅ Ledger refreshed (simulation fallback)');
     } catch (err: any) {
       console.error('Refresh ledger error:', err);
     }
@@ -477,7 +503,7 @@ export function ContractProvider({ children }: { children: ReactNode }) {
 
   // Provide contract context
   const contextValue: ContractContextType = {
-    contract,
+    connector,
     ledger,
     isInitialized,
     isDeployed,

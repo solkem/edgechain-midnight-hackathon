@@ -1,32 +1,31 @@
 /**
- * Midnight Network Integration Library
+ * Midnight Network Integration Library - V3 (DApp Connector API)
  *
  * Provides utilities for interacting with Midnight Network:
- * - Provider initialization
- * - ZK configuration
- * - Contract deployment and interaction
+ * - Configuration
+ * - Utility functions
+ * - Contract deployment helpers
+ *
+ * NOTE: This file no longer imports contract runtime or providers directly
+ * to avoid Vite bundling issues. See private-docs/ARCHITECTURE_REFACTOR.md
  */
 
-import { Contract as EdgeChainContract, ledger } from '@edgechain/contract/dist/managed/edgechain/contract/index.cjs';
-import type { Ledger } from '@edgechain/contract/dist/managed/edgechain/contract/index.cjs';
 import type { DAppConnectorAPI } from '@midnight-ntwrk/dapp-connector-api';
 
-// Import Midnight.js providers
-import {
-  createFetchZkConfigProvider
-} from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
+// ❌ REMOVED: Direct contract runtime imports (breaks Vite)
+// import { Contract as EdgeChainContract, ledger } from '@edgechain/contract/dist/managed/edgechain/contract/index.cjs';
+// import type { Ledger } from '@edgechain/contract/dist/managed/edgechain/contract/index.cjs';
 
-import {
-  createHttpClientProofProvider
-} from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
+// ❌ REMOVED: Provider function imports (version mismatches, not needed with DApp Connector)
+// import { createFetchZkConfigProvider } from '@midnight-ntwrk/midnight-js-fetch-zk-config-provider';
+// import { createHttpClientProofProvider } from '@midnight-ntwrk/midnight-js-http-client-proof-provider';
+// import { createIndexerPublicDataProvider } from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
+// import { createLevelPrivateStateProvider } from '@midnight-ntwrk/midnight-js-level-private-state-provider';
 
-import {
-  createIndexerPublicDataProvider
-} from '@midnight-ntwrk/midnight-js-indexer-public-data-provider';
-
-import {
-  createLevelPrivateStateProvider
-} from '@midnight-ntwrk/midnight-js-level-private-state-provider';
+// ✅ NEW ARCHITECTURE:
+// - Contract runs on Midnight blockchain (not in browser)
+// - Browser uses DApp Connector API to submit transactions
+// - No need for direct provider initialization
 
 /**
  * Midnight Network Configuration
@@ -52,110 +51,16 @@ export function getMidnightConfig(): MidnightConfig {
   };
 }
 
-/**
- * Create Midnight providers for contract interaction
- */
-export async function createMidnightProviders(
-  walletApi: DAppConnectorAPI,
-  config: MidnightConfig
-) {
-  console.log('🔧 Creating Midnight providers...');
+// ❌ REMOVED: createMidnightProviders - No longer needed with DApp Connector API
+// The wallet connector handles all provider setup internally
+// When we need providers in the future, we'll use the DApp Connector's built-in providers
 
-  try {
-    // 1. ZK Configuration Provider
-    // This loads the ZK circuit parameters from the build output
-    console.log('  ⚙️  Initializing ZK config provider...');
-    const zkConfigProvider = createFetchZkConfigProvider(
-      window.location.origin, // Base URL for fetching ZK artifacts
-      '/keys/',               // Path to proving/verification keys
-      '/zkir/'                // Path to circuit IR
-    );
+// ❌ REMOVED: initializeEdgeChainContract - No longer importing contract runtime
+// Contract execution happens on blockchain, not in browser
+// We submit transactions via DApp Connector API instead
 
-    // 2. Public Data Provider (Indexer)
-    // This provides read-only access to blockchain state
-    console.log('  ⚙️  Initializing indexer provider...');
-    const publicDataProvider = await createIndexerPublicDataProvider(
-      config.indexerUrl,
-      config.indexerWs
-    );
-
-    // 3. Private State Provider
-    // This manages local private state (encrypted data)
-    console.log('  ⚙️  Initializing private state provider...');
-    const privateStateProvider = createLevelPrivateStateProvider({
-      privateStateStoreName: `edgechain-private-state-${walletApi}`,
-    });
-
-    // 4. Proof Provider
-    // This generates ZK proofs for circuit execution
-    console.log('  ⚙️  Initializing proof provider...');
-
-    let proofProvider;
-    if (config.proofServerUrl) {
-      // Use remote proof server (recommended for production)
-      proofProvider = createHttpClientProofProvider(
-        config.proofServerUrl,
-        zkConfigProvider
-      );
-    } else {
-      // Use local proof generation (works but slower)
-      console.warn('⚠️  No proof server configured, using local proof generation');
-      proofProvider = createHttpClientProofProvider(
-        undefined, // No remote server
-        zkConfigProvider
-      );
-    }
-
-    console.log('✅ Midnight providers created successfully');
-
-    return {
-      zkConfigProvider,
-      publicDataProvider,
-      privateStateProvider,
-      proofProvider,
-      walletProvider: walletApi,
-    };
-  } catch (error) {
-    console.error('❌ Failed to create Midnight providers:', error);
-    throw error;
-  }
-}
-
-/**
- * Initialize EdgeChain contract instance
- */
-export async function initializeEdgeChainContract(
-  providers: any,
-  contractAddress: string
-): Promise<EdgeChainContract<any>> {
-  console.log('🚀 Initializing EdgeChain contract...');
-  console.log(`   Contract address: ${contractAddress}`);
-
-  try {
-    // Create contract instance with providers
-    // The Contract class is generated by the Compact compiler
-    const contract = new EdgeChainContract({});
-
-    // Note: The actual deployment/connection logic depends on Midnight.js SDK
-    // This is a simplified version. The real implementation will use:
-    // - createContractInstance() or similar from Midnight.js
-    // - Wire up providers to contract instance
-
-    console.log('✅ Contract instance created');
-
-    return contract;
-  } catch (error) {
-    console.error('❌ Failed to initialize contract:', error);
-    throw error;
-  }
-}
-
-/**
- * Parse ledger state from contract
- */
-export function parseLedgerState(state: any): Ledger {
-  return ledger(state);
-}
+// ❌ REMOVED: parseLedgerState - No longer importing ledger types
+// Ledger queries will use public data provider through DApp Connector
 
 /**
  * Deploy EdgeChain contract (for initial deployment)

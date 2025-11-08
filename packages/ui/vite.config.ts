@@ -7,6 +7,8 @@ import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 
 // https://vite.dev/config/
+// Based on working config from midnight-seabattle:
+// https://github.com/bricktowers/midnight-seabattle/blob/master/battleship-ui/vite.config.ts
 export default defineConfig({
   cacheDir: "./.vite",
   base: process.env.VITE_BASE_PATH || '/',
@@ -20,32 +22,41 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
   },
-  plugins: [react(), tailwindcss(), wasm(), topLevelAwait(), viteCommonjs()],
+  plugins: [
+    wasm(),
+    react(),
+    tailwindcss(),
+    viteCommonjs(),
+    topLevelAwait(),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      buffer: 'buffer',
-      process: 'process/browser',
-      util: 'util',
-      crypto: 'crypto-browserify',
-      stream: 'stream-browserify',
-      assert: 'assert',
-      http: 'stream-http',
-      https: 'https-browserify',
-      os: 'os-browserify',
-      url: 'url',
-      fs: 'browserify-fs',
+      util: 'util/',
     },
-    
   },
   optimizeDeps: {
     esbuildOptions: {
       target: "esnext",
+      define: {
+        global: 'globalThis',
+      },
     },
     include: [
-      'buffer',
-      'process',
+      'util',
     ],
+    // CRITICAL: Exclude Midnight packages with WASM from optimization
+    // These use top-level await which esbuild can't handle in CJS context
+    exclude: [
+      '@midnight-ntwrk/compact-runtime',
+      '@midnight-ntwrk/onchain-runtime',
+      '@midnight-ntwrk/zswap',
+      '@midnight-ntwrk/ledger',
+      'object-inspect', // Exclude so our util polyfill works
+    ],
+  },
+  ssr: {
+    noExternal: ['util', 'object-inspect'],
   },
   define: {},
 });

@@ -2,6 +2,10 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 // Import the wallet hook we created
 import { useWallet } from './providers/WalletProvider';
+// Import the contract context for deployment
+import { useContract } from './providers/ContractProvider';
+// Import the real FL Dashboard component with working training functionality
+import { FLDashboard as FLDashboardComponent } from './components/FLDashboard';
 
 // Types
 interface Wallet {
@@ -127,6 +131,7 @@ export default function EdgeChainApp() {
     <AppContext.Provider value={contextValue}>
       <BrowserRouter>
         <Routes>
+          {/* Main app routes */}
           <Route path="/" element={<LoginRoute />} />
           <Route path="/register" element={<RegisterRoute />} />
           <Route path="/selection" element={<SelectionRoute />} />
@@ -144,6 +149,7 @@ export default function EdgeChainApp() {
 function LoginRoute() {
   const { setWallet, setFarmer } = useAppContext();
   const navigate = useNavigate();
+  const [isDeploying, setIsDeploying] = useState(false);
 
   /**
    * Use the real Midnight wallet from WalletProvider instead of mock
@@ -161,15 +167,20 @@ function LoginRoute() {
     isConnecting,
     error,
     connectWallet,
-    disconnectWallet,
   } = walletContext;
+
+  /**
+   * Get contract context for deployment functionality
+   */
+  const contractContext = useContract();
 
   /**
    * When wallet connects successfully, update AppContext
    * and navigate to registration or selection
+   * BUT ONLY if contract is already deployed (not during deployment)
    */
   useEffect(() => {
-    if (isConnected && address) {
+    if (isConnected && address && contractContext.isDeployed && !isDeploying) {
       // Update the app's wallet state
       setWallet({ address });
 
@@ -184,10 +195,10 @@ function LoginRoute() {
         navigate('/register');
       }
     }
-  }, [isConnected, address]);
+  }, [isConnected, address, contractContext.isDeployed, isDeploying]);
 
   /**
-   * Pass Midnight wallet state and real connect function to Login component
+   * Pass Midnight wallet state, contract context, and real connect function to Login component
    */
   return (
     <Login
@@ -195,6 +206,10 @@ function LoginRoute() {
       isConnecting={isConnecting}
       isMidnightPreviewInstalled={isMidnightPreviewInstalled}
       error={error}
+      contractContext={contractContext}
+      walletContext={walletContext}
+      isDeploying={isDeploying}
+      setIsDeploying={setIsDeploying}
     />
   );
 }
@@ -259,31 +274,15 @@ function SelectionRoute() {
 }
 
 function TrainRoute() {
-  const { farmer, wallet, round, version, submissions, submitUpdate, disconnect } = useAppContext();
-  const { disconnectWallet } = useWallet();
-  const navigate = useNavigate();
+  const { farmer, wallet } = useAppContext();
 
   if (!farmer || !wallet) {
     return <Navigate to="/" replace />;
   }
 
-  return (
-    <FLDashboard
-      farmer={farmer}
-      wallet={wallet}
-      round={round}
-      version={version}
-      submissions={submissions}
-      onSubmit={submitUpdate}
-      onAggregation={() => navigate('/aggregation')}
-      onAI={() => navigate('/predictions')}
-      onDisconnect={() => {
-        disconnect();
-        disconnectWallet();
-        navigate('/');
-      }}
-    />
-  );
+  // Use the real FL Dashboard component with working training functionality
+  // It gets wallet and contract context from providers automatically
+  return <FLDashboardComponent />;
 }
 
 function AggregationRoute() {
@@ -335,6 +334,10 @@ function PredictionsRoute() {
  * - isConnecting: Are we currently connecting to Midnight devnet?
  * - isMidnightPreviewInstalled: Is Lace Midnight Preview extension installed?
  * - error: Any error message to display
+ * - contractContext: Contract deployment status and functions
+ * - walletContext: Full wallet context including connection status
+ * - isDeploying: Parent state tracking deployment
+ * - setIsDeploying: Function to update parent deployment state
  *
  * IMPORTANT: This connects to Midnight devnet with tDUST tokens, not Cardano!
  */
@@ -343,12 +346,56 @@ function Login({
   isConnecting = false,
   isMidnightPreviewInstalled = true,
   error = null,
+  contractContext,
+  walletContext,
+  isDeploying,
+  setIsDeploying,
 }: {
   onConnect: () => void;
   isConnecting?: boolean;
   isMidnightPreviewInstalled?: boolean;
   error?: string | null;
+  contractContext: any;
+  walletContext: any;
+  isDeploying: boolean;
+  setIsDeploying: (deploying: boolean) => void;
 }) {
+  const [deployError, setDeployError] = useState<string | null>(null);
+
+  const handleDeploy = async () => {
+    setDeployError(null);
+
+    // Step 1: Connect wallet if not connected
+    if (!walletContext.isConnected) {
+      try {
+        setIsDeploying(true);
+        await onConnect();
+        // Wait a moment for wallet to connect
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (err: any) {
+        console.error('Wallet connection failed:', err);
+        setDeployError(err.message || 'Failed to connect wallet');
+        setIsDeploying(false);
+        return;
+      }
+    } else {
+      setIsDeploying(true);
+    }
+
+    // Step 2: Deploy contract
+    try {
+      console.log('🚀 Starting contract deployment...');
+      await contractContext.deployContract();
+      console.log('✅ Contract deployed successfully!');
+      // Contract deployed successfully! The UI will update automatically
+      // because contractContext.isDeployed will change
+      setIsDeploying(false);
+    } catch (err: any) {
+      console.error('Deployment failed:', err);
+      setDeployError(err.message || 'Deployment failed');
+      setIsDeploying(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
@@ -362,6 +409,77 @@ function Login({
         </div>
 
         <div className="bg-slate-800/60 backdrop-blur-md border border-purple-500/30 rounded-2xl p-8">
+          {/* Show contract deployment UI if not deployed */}
+          {!contractContext.isDeployed && (
+            <div className="mb-6 bg-blue-900/30 border border-blue-500/50 rounded-lg p-6 space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-blue-400 text-3xl">📦</span>
+                <div>
+                  <p className="text-blue-300 font-bold text-lg">Setup Required</p>
+                  <p className="text-blue-200 text-sm">Deploy EdgeChain contract to Midnight devnet</p>
+                </div>
+              </div>
+
+              {deployError && (
+                <div className="p-3 bg-red-900/50 border border-red-500/50 rounded-lg">
+                  <p className="text-red-200 text-sm">❌ {deployError}</p>
+                </div>
+              )}
+
+              {contractContext.isProcessing && (
+                <div className="p-3 bg-purple-900/50 border border-purple-500/50 rounded-lg">
+                  <p className="text-purple-200 text-sm">⏳ Deploying contract... This may take 2-5 minutes</p>
+                  <p className="text-purple-300 text-xs mt-1">Generating ZK-proofs and submitting to blockchain</p>
+                </div>
+              )}
+
+              <div className="text-sm text-blue-100 space-y-2">
+                <p className="font-semibold">What this does:</p>
+                <ul className="text-xs text-blue-200 space-y-1 ml-4">
+                  <li>• Connects your Lace wallet</li>
+                  <li>• Deploys smart contract to Midnight testnet</li>
+                  <li>• Enables federated learning for all farmers</li>
+                  <li>• One-time setup (requires ~1 tDUST)</li>
+                </ul>
+              </div>
+
+              <button
+                onClick={handleDeploy}
+                disabled={isDeploying || contractContext.isProcessing || !isMidnightPreviewInstalled}
+                className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeploying || contractContext.isProcessing ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="animate-spin">⏳</span>
+                    Deploying Contract...
+                  </span>
+                ) : (
+                  'Deploy Contract'
+                )}
+              </button>
+
+              {!isMidnightPreviewInstalled && (
+                <p className="text-yellow-200 text-xs text-center">
+                  ⚠️ Please install Lace Midnight Preview first
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Show success message if contract is deployed */}
+          {contractContext.isDeployed && contractContext.contractAddress && (
+            <div className="mb-6 p-4 bg-green-900/30 border border-green-500/50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-green-400 text-2xl">✅</span>
+                <p className="text-green-300 font-semibold">Contract Deployed!</p>
+              </div>
+              <p className="text-green-100 text-xs font-mono break-all">
+                {contractContext.contractAddress}
+              </p>
+              <p className="text-green-200 text-sm mt-2">You can now connect and start training</p>
+            </div>
+          )}
+
           {/* Show error message if connection failed */}
           {error && (
             <div className="mb-4 p-4 bg-red-900/50 border border-red-500/50 rounded-lg">
@@ -691,70 +809,7 @@ function Selection({ farmer, onFL, onAI, onDisconnect }: { farmer: Farmer; onFL:
   );
 }
 
-function FLDashboard({ farmer, wallet, round, version, submissions, onSubmit, onAggregation, onAI, onDisconnect }: { farmer: Farmer; wallet: Wallet; round: number; version: number; submissions: Submission[]; onSubmit: () => void; onAggregation: () => void; onAI: () => void; onDisconnect: () => void }) {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900">
-      <div className="bg-slate-900/80 border-b border-purple-500/20 p-4">
-        <div className="max-w-6xl mx-auto flex justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Welcome, {farmer.name}</h1>
-            <p className="text-sm text-purple-300">{farmer.region}</p>
-          </div>
-          <div className="flex gap-3">
-            <button onClick={onAI} className="px-4 py-2 bg-green-600/20 text-green-300 rounded-lg hover:bg-green-600/30 transition-all text-sm">AI Predictions</button>
-            <button onClick={onDisconnect} className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-700 transition-all">Disconnect</button>
-          </div>
-        </div>
-      </div>
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="grid md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-slate-800/60 border border-purple-500/20 rounded-xl p-6">
-            <p className="text-sm text-purple-300 mb-2">Current Round</p>
-            <p className="text-4xl font-bold text-purple-400">{round}</p>
-          </div>
-          <div className="bg-slate-800/60 border border-purple-500/20 rounded-xl p-6">
-            <p className="text-sm text-purple-300 mb-2">Model Version</p>
-            <p className="text-4xl font-bold text-blue-400">v{version}</p>
-          </div>
-          <div className="bg-slate-800/60 border border-purple-500/20 rounded-xl p-6">
-            <p className="text-sm text-purple-300 mb-2">Member Since</p>
-            <p className="text-2xl font-bold text-white">{farmer.joinedAt.toLocaleDateString()}</p>
-          </div>
-        </div>
-        <div className="bg-slate-800/60 border border-purple-500/20 rounded-xl p-6 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-green-500">✓</span>
-            <h3 className="text-lg font-semibold text-white">Wallet Connected</h3>
-          </div>
-          <div className="bg-slate-900/60 rounded-lg p-4">
-            <p className="text-xs text-purple-300 mb-1">Lace Address</p>
-            <p className="text-sm text-white font-mono break-all">{wallet.address}</p>
-          </div>
-        </div>
-        <div className="grid md:grid-cols-2 gap-4">
-          <button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-xl transition-all">📥 Download Model</button>
-          <button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-xl transition-all">⚙️ Train Model</button>
-          <button onClick={onSubmit} className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-semibold py-4 rounded-xl transition-all">📤 Submit Update</button>
-          <button onClick={onAggregation} className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-4 rounded-xl transition-all">📊 View Aggregation</button>
-        </div>
-        {submissions.length > 0 && (
-          <div className="mt-6 bg-slate-800/60 border border-purple-500/20 rounded-xl p-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Your Submissions</h3>
-            {submissions.slice(-3).reverse().map(s => (
-              <div key={s.id} className="bg-slate-900/60 rounded-lg p-4 mb-2 flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-white font-mono">{s.proof}</p>
-                  <p className="text-xs text-purple-300 mt-1">{s.time.toLocaleString()}</p>
-                </div>
-                <span className="text-green-500">✓</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// Removed old placeholder FLDashboard - now using the real component from src/components/FLDashboard.tsx
 
 function Aggregation({ round, submissions, aggregating, progress, version, onTrigger, onBack }: { round: number; submissions: Submission[]; aggregating: boolean; progress: number; version: number; onTrigger: () => void; onBack: () => void }) {
   return (
