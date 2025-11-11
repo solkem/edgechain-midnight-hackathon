@@ -8,6 +8,7 @@
 import express from 'express';
 import cors from 'cors';
 import { aggregationRouter } from './routes/aggregation';
+import { arduinoRouter } from './routes/arduino';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -18,16 +19,19 @@ app.use(express.json({ limit: '50mb' })); // Large limit for model weights
 
 // Routes
 app.use('/api/fl', aggregationRouter);
+app.use('/api/arduino', arduinoRouter);
 
 // Root route
 app.get('/', (req, res) => {
   res.json({
     name: 'EdgeChain FL Aggregation Server',
     version: '1.0.0',
-    description: 'Federated Learning Aggregation Server for EdgeChain',
+    description: 'Federated Learning Aggregation Server for EdgeChain with Arduino IoT',
     endpoints: {
       health: '/health',
-      api: '/api/fl'
+      fl: '/api/fl',
+      arduino: '/api/arduino',
+      registry: '/api/arduino/registry'
     },
     status: 'running'
   });
