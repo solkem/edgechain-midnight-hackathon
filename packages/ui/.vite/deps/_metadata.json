@@ -1,67 +1,109 @@
 {
-  "hash": "5c4bd67e",
-  "configHash": "5df239ba",
-  "lockfileHash": "cedd16e6",
-  "browserHash": "16f33a21",
+  "hash": "3727ebbe",
+  "configHash": "f4b0d345",
+  "lockfileHash": "f7ecefd3",
+  "browserHash": "e3cd7dea",
   "optimized": {
     "buffer": {
       "src": "../../../../node_modules/buffer/index.js",
       "file": "buffer.js",
-      "fileHash": "30b136f2",
+      "fileHash": "7030f987",
       "needsInterop": true
     },
     "process": {
       "src": "../../../../node_modules/process/browser.js",
       "file": "process.js",
-      "fileHash": "6b301628",
+      "fileHash": "91823416",
       "needsInterop": true
     },
     "react": {
       "src": "../../../../node_modules/react/index.js",
       "file": "react.js",
-      "fileHash": "c2349dfd",
+      "fileHash": "6a457bac",
       "needsInterop": true
     },
     "react-dom": {
       "src": "../../../../node_modules/react-dom/index.js",
       "file": "react-dom.js",
-      "fileHash": "16d7050e",
+      "fileHash": "ceefc7ec",
       "needsInterop": true
     },
     "react/jsx-dev-runtime": {
       "src": "../../../../node_modules/react/jsx-dev-runtime.js",
       "file": "react_jsx-dev-runtime.js",
-      "fileHash": "7819ef61",
+      "fileHash": "aa4418a2",
       "needsInterop": true
     },
     "react/jsx-runtime": {
       "src": "../../../../node_modules/react/jsx-runtime.js",
       "file": "react_jsx-runtime.js",
-      "fileHash": "52481f6f",
+      "fileHash": "db27b4de",
       "needsInterop": true
     },
     "react-dom/client": {
       "src": "../../../../node_modules/react-dom/client.js",
       "file": "react-dom_client.js",
-      "fileHash": "4d150a04",
+      "fileHash": "b34e788a",
       "needsInterop": true
     },
     "react-router-dom": {
       "src": "../../../../node_modules/react-router-dom/dist/index.mjs",
       "file": "react-router-dom.js",
-      "fileHash": "a73ce6cb",
+      "fileHash": "785f59d6",
+      "needsInterop": false
+    },
+    "three": {
+      "src": "../../../../node_modules/three/build/three.module.js",
+      "file": "three.js",
+      "fileHash": "f19f72d8",
+      "needsInterop": false
+    },
+    "three/examples/jsm/controls/OrbitControls": {
+      "src": "../../../../node_modules/three/examples/jsm/controls/OrbitControls.js",
+      "file": "three_examples_jsm_controls_OrbitControls.js",
+      "fileHash": "6a39f5f8",
+      "needsInterop": false
+    },
+    "@tensorflow/tfjs": {
+      "src": "../../../../node_modules/@tensorflow/tfjs/dist/index.js",
+      "file": "@tensorflow_tfjs.js",
+      "fileHash": "d1eb1562",
+      "needsInterop": false
+    },
+    "clsx": {
+      "src": "../../../../node_modules/clsx/dist/clsx.mjs",
+      "file": "clsx.js",
+      "fileHash": "f31ff3c6",
+      "needsInterop": false
+    },
+    "tailwind-merge": {
+      "src": "../../../../node_modules/tailwind-merge/dist/bundle-mjs.mjs",
+      "file": "tailwind-merge.js",
+      "fileHash": "59f9b233",
+      "needsInterop": false
+    },
+    "lucide-react": {
+      "src": "../../../../node_modules/lucide-react/dist/esm/lucide-react.js",
+      "file": "lucide-react.js",
+      "fileHash": "d61e8295",
       "needsInterop": false
     }
   },
   "chunks": {
-    "chunk-WKJL36ZI": {
-      "file": "chunk-WKJL36ZI.js"
+    "chunk-BGYK2NIX": {
+      "file": "chunk-BGYK2NIX.js"
     },
-    "chunk-7TXWBGAX": {
-      "file": "chunk-7TXWBGAX.js"
+    "chunk-VYFZZWRU": {
+      "file": "chunk-VYFZZWRU.js"
     },
-    "chunk-5WRI5ZAA": {
-      "file": "chunk-5WRI5ZAA.js"
+    "chunk-XPUXLDOD": {
+      "file": "chunk-XPUXLDOD.js"
+    },
+    "chunk-FG6ULWAI": {
+      "file": "chunk-FG6ULWAI.js"
+    },
+    "chunk-G3PMV62Z": {
+      "file": "chunk-G3PMV62Z.js"
     }
   }
 }

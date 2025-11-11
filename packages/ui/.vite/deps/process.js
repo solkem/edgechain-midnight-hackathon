@@ -1,6 +1,6 @@
 import {
   __commonJS
-} from "./chunk-5WRI5ZAA.js";
+} from "./chunk-G3PMV62Z.js";
 
 // ../../node_modules/process/browser.js
 var require_browser = __commonJS({
