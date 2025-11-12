@@ -334,14 +334,15 @@ router.post('/submit-proof', async (req, res) => {
 /**
  * POST /api/arduino/simulate
  * Simulate receiving Arduino data (for testing without hardware)
- * Persists reading to database
+ * Persists reading to database and optionally to IPFS
  */
-router.post('/simulate', (req, res) => {
+router.post('/simulate', async (req, res) => {
   try {
     const {
       temperature = 25.0,
       humidity = 65.0,
       device_pubkey,
+      use_ipfs = false, // Optional: enable IPFS storage
     } = req.body;
 
     const reading = bleService.simulateReading(
@@ -350,11 +351,34 @@ router.post('/simulate', (req, res) => {
       device_pubkey
     );
 
-    // Persist reading to database
+    // Persist reading to database (and optionally IPFS)
     if (device_pubkey) {
       try {
-        const readingId = dbService.saveReading(reading);
-        console.log(`✅ Reading persisted: ID ${readingId}`);
+        let ipfs_cid: string | undefined;
+
+        // Upload to IPFS if enabled
+        if (use_ipfs) {
+          try {
+            // Import IPFS service dynamically (optional dependency)
+            const { ipfsStorage } = await import('../services/ipfsStorage');
+
+            ipfs_cid = await ipfsStorage.uploadReading({
+              reading_json: reading.reading_json,
+              signature: reading.signature,
+              device_pubkey: reading.device_pubkey,
+              timestamp: reading.timestamp,
+            });
+
+            console.log(`📤 Uploaded to IPFS: ${ipfs_cid}`);
+          } catch (ipfsError: any) {
+            console.error('⚠️  IPFS upload failed (continuing with DB only):', ipfsError.message);
+            // Continue with database-only storage
+          }
+        }
+
+        // Save to database (with optional IPFS CID)
+        const readingId = dbService.saveReading(reading, ipfs_cid);
+        console.log(`✅ Reading persisted: ID ${readingId}${ipfs_cid ? ` (IPFS: ${ipfs_cid})` : ''}`);
       } catch (dbError: any) {
         console.error('⚠️  Failed to persist reading:', dbError.message);
         // Don't fail the request if persistence fails

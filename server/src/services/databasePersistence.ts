@@ -24,13 +24,15 @@ export interface DeviceRecord {
 export interface ReadingRecord {
   id: number;
   device_pubkey: string;
-  reading_json: string;
+  ipfs_cid: string | null; // IPFS Content ID
+  reading_json: string | null; // Local backup (optional)
   temperature: number;
   humidity: number;
   timestamp_device: number;
   signature_r: string;
   signature_s: string;
   batch_id: string | null;
+  storage_type: 'database' | 'ipfs' | 'hybrid';
   created_at: number;
 }
 
@@ -135,13 +137,24 @@ export class DatabasePersistenceService {
 
   /**
    * Persist sensor reading to database
+   * Supports both database-only and hybrid (database + IPFS) storage
    */
-  saveReading(reading: SignedReading): number {
+  saveReading(reading: SignedReading, ipfs_cid?: string): number {
     const parsed = JSON.parse(reading.reading_json);
+
+    // Determine storage type
+    let storage_type: 'database' | 'ipfs' | 'hybrid' = 'database';
+    let reading_json_value: string | null = reading.reading_json;
+
+    if (ipfs_cid) {
+      storage_type = 'hybrid'; // Store both locally and in IPFS
+      // For IPFS-only mode, set reading_json to null: storage_type = 'ipfs'; reading_json_value = null;
+    }
 
     const stmt = this.db.prepare(`
       INSERT INTO sensor_readings (
         device_pubkey,
+        ipfs_cid,
         reading_json,
         temperature,
         humidity,
@@ -149,25 +162,33 @@ export class DatabasePersistenceService {
         signature_r,
         signature_s,
         batch_id,
+        storage_type,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // For now, store the signature in signature_r and leave signature_s empty
     // This matches the schema which expects separate r and s values
     const info = stmt.run(
       reading.device_pubkey,
-      reading.reading_json,
+      ipfs_cid || null,
+      reading_json_value,
       parsed.t,
       parsed.h,
       parsed.ts,
       reading.signature, // Store full signature in signature_r
       '', // Empty signature_s for now
       null, // batch_id assigned later
+      storage_type,
       Math.floor(Date.now() / 1000)
     );
 
-    console.log(`📊 Reading saved to database: ID ${info.lastInsertRowid}`);
+    if (ipfs_cid) {
+      console.log(`📊 Reading saved (hybrid): DB ID ${info.lastInsertRowid}, IPFS CID ${ipfs_cid}`);
+    } else {
+      console.log(`📊 Reading saved to database: ID ${info.lastInsertRowid}`);
+    }
+
     return info.lastInsertRowid as number;
   }
 

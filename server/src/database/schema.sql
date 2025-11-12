@@ -23,13 +23,15 @@ CREATE INDEX IF NOT EXISTS idx_devices_owner ON devices(owner_wallet);
 CREATE TABLE IF NOT EXISTS sensor_readings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   device_pubkey TEXT NOT NULL,
-  reading_json TEXT NOT NULL,
+  ipfs_cid TEXT, -- IPFS Content ID (decentralized storage)
+  reading_json TEXT, -- Local backup (optional, can be null if using IPFS)
   temperature REAL,
   humidity REAL,
   timestamp_device INTEGER NOT NULL,
   signature_r TEXT NOT NULL,
   signature_s TEXT NOT NULL,
   batch_id TEXT,
+  storage_type TEXT DEFAULT 'database' CHECK (storage_type IN ('database', 'ipfs', 'hybrid')),
   created_at INTEGER DEFAULT (strftime('%s', 'now')),
   FOREIGN KEY (device_pubkey) REFERENCES devices(device_pubkey)
 );
@@ -37,6 +39,7 @@ CREATE TABLE IF NOT EXISTS sensor_readings (
 CREATE INDEX IF NOT EXISTS idx_readings_device ON sensor_readings(device_pubkey);
 CREATE INDEX IF NOT EXISTS idx_readings_batch ON sensor_readings(batch_id);
 CREATE INDEX IF NOT EXISTS idx_readings_created ON sensor_readings(created_at);
+CREATE INDEX IF NOT EXISTS idx_readings_cid ON sensor_readings(ipfs_cid);
 
 -- Batch Proofs
 CREATE TABLE IF NOT EXISTS batch_proofs (
