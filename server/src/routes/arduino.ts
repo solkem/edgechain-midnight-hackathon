@@ -8,6 +8,8 @@ import { Router } from 'express';
 import { DeviceRegistryService } from '../services/deviceRegistry';
 import { BLEReceiverService } from '../services/bleReceiver';
 import { SignedReading } from '../types/arduino';
+// TODO: Re-enable in Phase 3 (Midnight SDK integration)
+// import { deploymentWalletService } from '../services/deploymentWallet';
 
 const router = Router();
 const registryService = new DeviceRegistryService();
@@ -327,6 +329,56 @@ router.post('/simulate', (req, res) => {
     res.json({
       success: true,
       reading,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/arduino/claim-rewards
+ * Transfer tDUST rewards from deployment wallet to farmer
+ * TODO: Re-enable in Phase 3 (Midnight SDK integration)
+ */
+router.post('/claim-rewards', async (req, res) => {
+  try {
+    const { farmerAddress, amount } = req.body;
+
+    console.log('\n💰 REWARD CLAIM REQUEST (MOCK - Waiting for Phase 3)');
+    console.log('═══════════════════════════════════════');
+    console.log(`📍 Farmer: ${farmerAddress?.slice(0, 30)}...`);
+    console.log(`💵 Amount: ${amount} tDUST`);
+    console.log('═══════════════════════════════════════');
+
+    // Mock response until we implement real Midnight SDK integration
+    res.json({
+      success: true,
+      txHash: 'mock_tx_' + Date.now(),
+      amount,
+      message: 'Mock reward claim - will be real in Phase 3'
+    });
+
+  } catch (error: any) {
+    console.error('❌ Claim rewards error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /api/arduino/wallet-balance
+ * Get deployment wallet balance
+ * TODO: Re-enable in Phase 3 (Midnight SDK integration)
+ */
+router.get('/wallet-balance', async (_req, res) => {
+  try {
+    // Mock balance until we implement real Midnight SDK integration
+    res.json({
+      balance: 1000.0,
+      unit: 'tDUST',
+      message: 'Mock balance - will be real in Phase 3'
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
