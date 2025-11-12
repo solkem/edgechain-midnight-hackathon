@@ -28,12 +28,32 @@ const gatewayPath = path.join(__dirname, '../../gateway');
 console.log(`📁 Serving gateway files from: ${gatewayPath}`);
 app.use('/gateway', express.static(gatewayPath));
 
-// Routes
-app.use('/api/fl', aggregationRouter);
-app.use('/api/arduino', arduinoRouter);
+// Serve frontend static files from packages/ui/dist
+const frontendPath = path.join(__dirname, '../../packages/ui/dist');
+console.log(`📁 Serving frontend from: ${frontendPath}`);
+app.use(express.static(frontendPath));
 
-// Root route
-app.get('/', (_req, res) => {
+// Health check (must be before catch-all route)
+app.get('/health', (_req, res) => {
+  res.json({ status: 'healthy', timestamp: Date.now() });
+});
+
+// Database statistics endpoint (must be before catch-all route)
+app.get('/api/db-stats', (_req, res) => {
+  try {
+    const stats = getDatabaseStats();
+    res.json({
+      database: 'SQLite',
+      stats,
+      timestamp: Date.now()
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API info endpoint (must be before catch-all route)
+app.get('/api', (_req, res) => {
   res.json({
     name: 'EdgeChain Unified Backend',
     version: '2.0.0',
@@ -55,23 +75,13 @@ app.get('/', (_req, res) => {
   });
 });
 
-// Health check
-app.get('/health', (_req, res) => {
-  res.json({ status: 'healthy', timestamp: Date.now() });
-});
+// API Routes (must be before catch-all route)
+app.use('/api/fl', aggregationRouter);
+app.use('/api/arduino', arduinoRouter);
 
-// Database statistics endpoint
-app.get('/api/db-stats', (_req, res) => {
-  try {
-    const stats = getDatabaseStats();
-    res.json({
-      database: 'SQLite',
-      stats,
-      timestamp: Date.now()
-    });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
+// SPA fallback - serve frontend for all other routes (MUST BE LAST)
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
 // Start server

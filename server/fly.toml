@@ -1,33 +1,57 @@
-# fly.toml app configuration file generated for edgechain-ai-midnight on 2025-11-06T01:27:43Z
+# fly.toml app configuration file generated for edgechain-midnight on 2025-11-12T04:13:27Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'edgechain-ai-midnight'
+app = 'edgechain-midnight'
 primary_region = 'iad'
 
 [build]
+  dockerfile = 'Dockerfile'
 
 [env]
   NODE_ENV = 'production'
   PORT = '3001'
 
+[[mounts]]
+  source = 'edgechain_data'
+  destination = '/app/data'
+  initial_size = '1gb'
+
 [http_service]
   internal_port = 3001
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = 'off'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ['app']
 
   [[http_service.checks]]
-    interval = '30s'
-    timeout = '5s'
-    grace_period = '10s'
+    interval = '10s'
+    timeout = '2s'
+    grace_period = '5s'
     method = 'GET'
-    path = '/health'
+    path = '/api/db-stats'
+
+[[services]]
+  protocol = 'tcp'
+  internal_port = 3001
+
+  [[services.ports]]
+    port = 80
+    handlers = ['http']
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ['tls', 'http']
+
+  [services.concurrency]
+    type = 'connections'
+    hard_limit = 25
+    soft_limit = 20
 
 [[vm]]
-  memory = '1gb'
+  memory = '512mb'
   cpu_kind = 'shared'
   cpus = 1
