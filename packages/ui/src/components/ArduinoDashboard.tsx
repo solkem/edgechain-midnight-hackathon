@@ -283,9 +283,14 @@ export function ArduinoDashboard() {
   };
 
   /**
-   * Register device with backend
+   * @deprecated DO NOT USE - Creates fake device without actual hardware
+   * Device registration now happens automatically via checkAndRegisterDevice()
+   * when a real Arduino connects via BLE and sends its first reading.
+   *
+   * This function was used for demo/testing but creates misleading UX where
+   * users think they have a device registered when they don't have hardware.
    */
-  const handleRegisterDevice = async () => {
+  const handleRegisterDevice_DEPRECATED = async () => {
     if (!wallet.isConnected || !wallet.address) {
       setError('Please connect your wallet first');
       return;
@@ -845,22 +850,54 @@ export function ArduinoDashboard() {
         )}
 
         {!deviceInfo?.registered ? (
-          /* Registration Flow */
-          <div className="bg-slate-800/60 backdrop-blur-md border border-green-500/30 rounded-2xl p-8 text-center">
-            <div className="mb-6">
-              <div className="text-6xl mb-4">🔐</div>
-              <h2 className="text-2xl font-bold text-white mb-2">Register Your IoT Kit</h2>
-              <p className="text-green-200">
-                Register to start collecting ZK-verified sensor data and earning tDUST rewards
+          /* BLE Connection Flow */
+          <div className="bg-slate-800/60 backdrop-blur-md border border-blue-500/30 rounded-2xl p-8">
+            <div className="mb-6 text-center">
+              <div className="text-6xl mb-4">📡</div>
+              <h2 className="text-2xl font-bold text-white mb-2">Connect Your Arduino IoT Kit</h2>
+              <p className="text-blue-200 mb-6">
+                Connect your Arduino Nano 33 BLE Sense via Bluetooth to start earning rewards
               </p>
             </div>
-            <button
-              onClick={handleRegisterDevice}
-              disabled={!wallet.isConnected}
-              className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold py-4 px-8 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
-            >
-              {wallet.isConnected ? '🔗 Register IoT Kit Device' : '⚠️ Connect Wallet First'}
-            </button>
+
+            {/* Requirements */}
+            <div className="bg-yellow-500/20 border border-yellow-400/50 rounded-lg p-4 mb-4">
+              <p className="text-yellow-200 text-sm font-semibold mb-2">
+                ⚠️ Requirements:
+              </p>
+              <ul className="text-yellow-100 text-sm space-y-1 list-disc list-inside">
+                <li>Arduino Nano 33 BLE Sense with EdgeChain firmware flashed</li>
+                <li>Wallet connected (for device ownership)</li>
+                <li>Browser with Web Bluetooth support (Chrome, Edge, Opera)</li>
+                <li>Arduino powered on and within BLE range (~10 meters)</li>
+              </ul>
+            </div>
+
+            {/* How it works */}
+            <div className="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4 mb-6">
+              <p className="text-blue-200 text-sm font-semibold mb-2">
+                📝 How it works:
+              </p>
+              <ol className="text-blue-100 text-sm space-y-1 list-decimal list-inside">
+                <li>Click "Connect IoT Kit" below</li>
+                <li>Select "EdgeChain-Demo" from the BLE device picker</li>
+                <li>Device will auto-register to your wallet on first reading</li>
+                <li>Start earning 0.1 DUST per verified reading!</li>
+              </ol>
+            </div>
+
+            <div className="text-center">
+              <button
+                onClick={connectBLE}
+                disabled={!wallet.isConnected}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-4 px-8 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+              >
+                {wallet.isConnected ? '📡 Connect IoT Kit via BLE' : '⚠️ Connect Wallet First'}
+              </button>
+              <p className="text-gray-400 text-sm mt-4">
+                Need firmware? Check <code className="bg-gray-800 px-2 py-1 rounded">arduino/edgechain_iot/</code>
+              </p>
+            </div>
           </div>
         ) : (
           <>
