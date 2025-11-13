@@ -1,8 +1,9 @@
 /**
- * IPFS Storage Service using Storacha (formerly Web3.Storage)
+ * IPFS Storage Service using Microservice Architecture
  *
  * Provides decentralized storage for ZK proofs and IoT sensor readings.
- * - FREE unlimited storage
+ * - Calls separate ESM-based IPFS microservice on port 3002
+ * - FREE unlimited storage via Storacha
  * - Content-addressed (CID-based)
  * - Censorship-resistant
  * - Perfect for privacy-preserving IoT data
@@ -12,12 +13,6 @@
  * 2. Store CID in database (zk_proof_submissions.ipfs_cid)
  * 3. Anyone can retrieve and verify from IPFS
  */
-
-// IPFS imports disabled due to CommonJS/ESM incompatibility
-// These packages are ESM-only and cannot be imported in CommonJS context
-// TODO: Convert server to ESM or use a separate microservice for IPFS
-// import * as Client from '@storacha/client';
-// import * as Signer from '@ucanto/principal/ed25519';
 
 export interface IPFSZKProofData {
   // ZK Proof data
@@ -55,39 +50,49 @@ export interface IPFSReading {
 }
 
 export class IPFSStorageService {
-  private client: any;
+  private ipfsServiceUrl: string;
   private initialized: boolean = false;
 
   constructor() {
-    // Client will be initialized on first use
+    // IPFS microservice endpoint
+    this.ipfsServiceUrl = process.env.IPFS_SERVICE_URL || 'http://localhost:3002';
   }
 
   /**
-   * Initialize the Storacha client
-   * This requires an email for authorization (free tier)
+   * Check if IPFS service is available
    */
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
     try {
-      // IPFS initialization disabled - ESM/CommonJS incompatibility
-      // TODO: Enable by converting server to ESM or using separate microservice
+      const response = await fetch(`${this.ipfsServiceUrl}/health`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(2000) // 2 second timeout
+      });
 
-      console.log('⚠️  IPFS Storage Service: DISABLED (CommonJS/ESM incompatibility)');
-      console.log('   ZK proofs will be stored in database only');
-      console.log('   Architecture is ready - just needs ESM conversion');
-      this.initialized = false;
+      if (response.ok) {
+        const data = await response.json();
+        this.initialized = data.ipfs_enabled || false;
+
+        if (this.initialized) {
+          console.log('✅ IPFS Storage Service: Connected to microservice');
+          console.log(`   Service URL: ${this.ipfsServiceUrl}`);
+        } else {
+          console.log('⚠️  IPFS microservice in mock mode (no credentials)');
+          console.log('   Will generate mock CIDs for demo purposes');
+        }
+      } else {
+        throw new Error(`Health check failed: ${response.status}`);
+      }
     } catch (error: any) {
-      console.error('❌ Failed to initialize IPFS Storage Service:', error.message);
-      console.error('   Note: IPFS uploads will be disabled for this session');
-      console.error('   Cause: CommonJS/ESM compatibility (Storacha requires ESM)');
-      // Don't throw - allow service to continue without IPFS
+      console.error('⚠️  IPFS microservice not available:', error.message);
+      console.log('   ZK proofs will be stored in database only');
       this.initialized = false;
     }
   }
 
   /**
-   * Upload ZK proof and reading to IPFS
+   * Upload ZK proof and reading to IPFS via microservice
    * Returns the Content ID (CID) for later retrieval
    *
    * This makes the proof publicly verifiable while maintaining device privacy!
@@ -97,21 +102,46 @@ export class IPFSStorageService {
       await this.initialize();
     }
 
+    if (!this.initialized) {
+      throw new Error('IPFS service not available');
+    }
+
     try {
-      // Convert data to blob
-      const jsonData = JSON.stringify(data, null, 2);
-      const blob = new Blob([jsonData], { type: 'application/json' });
-      const filename = `zk-proof-${data.public_inputs.nullifier.slice(0, 16)}-${data.reading.timestamp}.json`;
-      const file = new File([blob], filename);
+      const response = await fetch(`${this.ipfsServiceUrl}/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          proof: data.proof,
+          public_inputs: data.public_inputs,
+          reading: data.reading,
+          metadata: {
+            collection_mode: data.collection_mode,
+            reward: data.reward,
+            verified: data.verified,
+            submitted_at: data.submitted_at
+          }
+        }),
+        signal: AbortSignal.timeout(30000) // 30 second timeout for upload
+      });
 
-      // Upload to IPFS via Storacha
-      const cid = await this.client.uploadFile(file);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `Upload failed: ${response.status}`);
+      }
 
-      console.log(`📤 Uploaded ZK proof to IPFS: ${cid}`);
+      const result = await response.json();
+
+      console.log(`📤 Uploaded ZK proof to IPFS: ${result.cid}`);
       console.log(`   Nullifier: ${data.public_inputs.nullifier.slice(0, 16)}...`);
-      console.log(`   Gateway: https://${cid}.ipfs.w3s.link/`);
+      console.log(`   Gateway: ${result.gateway_url}`);
 
-      return cid.toString();
+      if (result.mock) {
+        console.log(`   ⚠️  Using mock CID (IPFS credentials not configured)`);
+      }
+
+      return result.cid;
     } catch (error: any) {
       console.error('❌ Failed to upload ZK proof to IPFS:', error.message);
       throw error;
@@ -119,25 +149,47 @@ export class IPFSStorageService {
   }
 
   /**
-   * Upload sensor reading to IPFS (legacy support)
-   * Returns the Content ID (CID) for later retrieval
+   * Upload signed reading to IPFS via microservice
    */
-  async uploadReading(reading: IPFSReading): Promise<string> {
+  async uploadReading(data: IPFSReading): Promise<string> {
     if (!this.initialized) {
       await this.initialize();
     }
 
+    if (!this.initialized) {
+      throw new Error('IPFS service not available');
+    }
+
     try {
-      // Convert reading to blob
-      const data = JSON.stringify(reading);
-      const blob = new Blob([data], { type: 'application/json' });
-      const file = new File([blob], `reading-${reading.timestamp}.json`);
+      const response = await fetch(`${this.ipfsServiceUrl}/upload`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          proof: 'signed_reading',
+          public_inputs: {
+            device_pubkey: data.device_pubkey,
+            timestamp: data.timestamp
+          },
+          reading: JSON.parse(data.reading_json),
+          metadata: {
+            signature: data.signature,
+            ...data.metadata
+          }
+        }),
+        signal: AbortSignal.timeout(30000)
+      });
 
-      // Upload to IPFS via Storacha
-      const cid = await this.client.uploadFile(file);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || `Upload failed: ${response.status}`);
+      }
 
-      console.log(`📤 Uploaded reading to IPFS: ${cid}`);
-      return cid.toString();
+      const result = await response.json();
+      console.log(`📤 Uploaded signed reading to IPFS: ${result.cid}`);
+
+      return result.cid;
     } catch (error: any) {
       console.error('❌ Failed to upload reading to IPFS:', error.message);
       throw error;
@@ -145,114 +197,54 @@ export class IPFSStorageService {
   }
 
   /**
-   * Upload multiple ZK proofs as a batch
-   * More efficient than individual uploads
+   * Retrieve ZK proof from IPFS by CID via microservice
    */
-  async uploadZKProofBatch(proofs: IPFSZKProofData[]): Promise<string[]> {
+  async retrieveZKProof(cid: string): Promise<IPFSZKProofData | null> {
     if (!this.initialized) {
       await this.initialize();
     }
 
-    try {
-      const cids: string[] = [];
-
-      // Create files for each proof
-      const files = proofs.map((proof, index) => {
-        const data = JSON.stringify(proof, null, 2);
-        const blob = new Blob([data], { type: 'application/json' });
-        const filename = `zk-proof-${index}-${proof.reading.timestamp}.json`;
-        return new File([blob], filename);
-      });
-
-      // Upload directory of proofs
-      const dirCid = await this.client.uploadDirectory(files);
-
-      console.log(`📤 Uploaded ${proofs.length} ZK proofs to IPFS: ${dirCid}`);
-
-      // For simplicity, return the directory CID for all proofs
-      // In production, you might want individual CIDs
-      return proofs.map(() => dirCid.toString());
-    } catch (error: any) {
-      console.error('❌ Failed to upload ZK proof batch to IPFS:', error.message);
-      throw error;
-    }
-  }
-
-  /**
-   * Retrieve ZK proof from IPFS by CID
-   * Anyone can call this - it's public data!
-   * The proof is verifiable even though device identity stays private!
-   */
-  async getZKProof(cid: string): Promise<IPFSZKProofData | null> {
-    try {
-      // Fetch from IPFS gateway
-      const response = await fetch(`https://${cid}.ipfs.w3s.link/`);
-
-      if (!response.ok) {
-        console.error(`Failed to fetch CID ${cid}: ${response.statusText}`);
-        return null;
-      }
-
-      const data = await response.json();
-      return data as IPFSZKProofData;
-    } catch (error: any) {
-      console.error(`❌ Failed to retrieve ZK proof from IPFS (${cid}):`, error.message);
+    if (!this.initialized) {
       return null;
     }
-  }
 
-  /**
-   * Retrieve reading from IPFS by CID (legacy support)
-   * Anyone can call this - it's public data!
-   */
-  async getReading(cid: string): Promise<IPFSReading | null> {
     try {
-      // Fetch from IPFS gateway
-      const response = await fetch(`https://${cid}.ipfs.w3s.link/`);
+      const response = await fetch(`${this.ipfsServiceUrl}/retrieve/${cid}`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
 
       if (!response.ok) {
-        console.error(`Failed to fetch CID ${cid}: ${response.statusText}`);
-        return null;
+        throw new Error(`Retrieval failed: ${response.status}`);
       }
 
-      const data = await response.json();
-      return data as IPFSReading;
+      const result = await response.json();
+
+      if (result.success) {
+        console.log(`📥 Retrieved ZK proof from IPFS: ${cid}`);
+        return result.data;
+      } else {
+        throw new Error('Retrieval unsuccessful');
+      }
     } catch (error: any) {
-      console.error(`❌ Failed to retrieve reading from IPFS (${cid}):`, error.message);
+      console.error('❌ Failed to retrieve from IPFS:', error.message);
       return null;
     }
   }
 
   /**
    * Get IPFS gateway URL for a CID
-   * Useful for frontend to display links
+   * Anyone can use this URL to retrieve and verify the proof
    */
   getGatewayUrl(cid: string): string {
-    return `https://${cid}.ipfs.w3s.link/`;
+    return `https://w3s.link/ipfs/${cid}`;
   }
 
   /**
-   * Verify a ZK proof from IPFS
-   * Demonstrates that proofs stored on IPFS are still verifiable!
+   * Check if IPFS service is currently available
    */
-  async verifyProofFromIPFS(cid: string): Promise<boolean> {
-    try {
-      const data = await this.getZKProof(cid);
-      if (!data) return false;
-
-      // In production, this would call the actual ZK proof verification
-      // For now, we just check the structure
-      const hasProof = !!data.proof;
-      const hasPublicInputs = !!data.public_inputs;
-      const hasNullifier = !!data.public_inputs?.nullifier;
-      const hasReading = !!data.reading;
-      const hasTemperature = typeof data.reading?.temperature === 'number';
-
-      return hasProof && hasPublicInputs && hasNullifier && hasReading && hasTemperature;
-    } catch (error: any) {
-      console.error(`❌ Failed to verify proof from IPFS (${cid}):`, error.message);
-      return false;
-    }
+  isAvailable(): boolean {
+    return this.initialized;
   }
 }
 
