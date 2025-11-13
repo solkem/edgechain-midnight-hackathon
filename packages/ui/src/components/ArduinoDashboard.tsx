@@ -898,7 +898,7 @@ export function ArduinoDashboard() {
               </p>
               <ol className="text-blue-100 text-sm space-y-1 list-decimal list-inside">
                 <li>Click "Connect IoT Kit" below</li>
-                <li>Select "EdgeChain-Demo" from the BLE device picker</li>
+                <li>Select your Arduino from BLE picker (named "EdgeChain-XXXX" with unique ID)</li>
                 <li>Device will auto-register to your wallet on first reading</li>
                 <li>Start earning 0.1 DUST per verified reading!</li>
               </ol>
