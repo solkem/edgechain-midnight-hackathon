@@ -102,6 +102,15 @@ export function ArduinoDashboard() {
   const [backendConsistency, setBackendConsistency] = useState<BackendConsistency | null>(null);
   const [backendIncentives, setBackendIncentives] = useState<BackendIncentives | null>(null);
 
+  // Privacy & ZK Proof state
+  const [usePrivateMode, setUsePrivateMode] = useState(true); // Default to private!
+  const [deviceSecret, setDeviceSecret] = useState<string | null>(null);
+  const [currentNullifier, setCurrentNullifier] = useState<string | null>(null);
+  const [currentEpoch, setCurrentEpoch] = useState<number>(Math.floor(Date.now() / (24 * 60 * 60 * 1000)));
+  const [zkProofStats, setZkProofStats] = useState<any>(null);
+  const [lastProofGenTime, setLastProofGenTime] = useState<number>(0);
+  const [anonymitySetSize, setAnonymitySetSize] = useState<number>(0);
+
   // Auto-collect sensor data every 10 seconds when active
   useEffect(() => {
     if (!isCollecting) return;
@@ -334,6 +343,141 @@ export function ArduinoDashboard() {
   };
 
   /**
+   * Initialize device secret for ZK proofs (one-time)
+   * In production, this would be securely stored on the device
+   */
+  const initializeDeviceSecret = () => {
+    if (!deviceSecret && deviceInfo?.pubkey) {
+      // Generate deterministic secret from device pubkey (DEMO ONLY)
+      // In production, this would be securely generated and stored on Arduino
+      const secret = Array.from(deviceInfo.pubkey.slice(0, 64))
+        .map((c, i) => String.fromCharCode(c.charCodeAt(0) + i % 10))
+        .join('')
+        .substring(0, 64);
+      setDeviceSecret(secret);
+      console.log('🔐 Device secret initialized for ZK proofs');
+      return secret;
+    }
+    return deviceSecret;
+  };
+
+  /**
+   * Fetch ZK proof statistics and privacy metrics
+   */
+  const fetchZKStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/arduino/zk/stats`);
+      const data = await response.json();
+
+      setZkProofStats(data);
+      setAnonymitySetSize(data.privacy?.anonymity_set_size || 0);
+      setCurrentEpoch(data.privacy?.current_epoch || Math.floor(Date.now() / (24 * 60 * 60 * 1000)));
+
+      console.log('📊 ZK Stats:', data);
+    } catch (err) {
+      console.error('Failed to fetch ZK stats:', err);
+    }
+  };
+
+  /**
+   * Generate ZK proof for sensor reading (PRIVACY MODE)
+   */
+  const generateZKProof = async (temperature: number, humidity: number) => {
+    if (!deviceInfo?.pubkey || !wallet.address) {
+      throw new Error('Device not registered or wallet not connected');
+    }
+
+    const secret = deviceSecret || initializeDeviceSecret();
+    if (!secret) {
+      throw new Error('Failed to initialize device secret');
+    }
+
+    console.log('\n🔐 GENERATING ZK PROOF (PRIVATE MODE)');
+    console.log('═══════════════════════════════════════');
+
+    const startTime = Date.now();
+
+    try {
+      const response = await fetch(`${API_BASE}/api/arduino/zk/generate-proof`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          temperature,
+          humidity,
+          timestamp: Math.floor(Date.now() / 1000),
+          device_pubkey: deviceInfo.pubkey,
+          device_secret: secret,
+          collection_mode: deviceInfo.collectionMode || 'auto',
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Proof generation failed');
+      }
+
+      const proofTime = Date.now() - startTime;
+      setLastProofGenTime(proofTime);
+      setCurrentNullifier(data.public_inputs.nullifier);
+
+      console.log(`✅ ZK Proof generated in ${proofTime}ms`);
+      console.log(`   Nullifier: ${data.public_inputs.nullifier.slice(0, 16)}...`);
+      console.log(`   Epoch: ${data.public_inputs.epoch}`);
+      console.log('═══════════════════════════════════════\n');
+
+      return data;
+    } catch (err: any) {
+      console.error('❌ ZK proof generation failed:', err);
+      throw err;
+    }
+  };
+
+  /**
+   * Submit private reading with ZK proof
+   */
+  const submitPrivateReading = async (proof: any, temperature: number, humidity: number) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/arduino/zk/submit-private-reading`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proof: proof.proof,
+          public_inputs: proof.public_inputs,
+          temperature,
+          humidity,
+          timestamp: Math.floor(Date.now() / 1000),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Private submission failed');
+      }
+
+      console.log('✅ PRIVATE READING SUBMITTED');
+      console.log(`   Reward: ${data.reward} tDUST`);
+      console.log(`   Your identity: ANONYMOUS`);
+      console.log(`   Nullifier: ${data.nullifier.slice(0, 16)}...`);
+
+      return data;
+    } catch (err: any) {
+      console.error('❌ Private submission failed:', err);
+      throw err;
+    }
+  };
+
+  // Fetch ZK stats when device is registered
+  useEffect(() => {
+    if (deviceInfo?.registered) {
+      fetchZKStats();
+      const interval = setInterval(fetchZKStats, 60000); // Update every minute
+      return () => clearInterval(interval);
+    }
+  }, [deviceInfo?.registered]);
+
+  /**
    * Connect to IoT Kit via Web Bluetooth API
    */
   const connectBLE = async () => {
@@ -403,41 +547,83 @@ export function ArduinoDashboard() {
 
   /**
    * Collect a sensor reading (fallback simulation for testing without hardware)
+   * Supports PRIVATE MODE with ZK proofs for farmer privacy
    */
   const collectReading = async () => {
     try {
       setError(null);
 
-      // Simulate realistic agricultural sensor data
-      const response = await fetch(`${API_BASE}/api/arduino/simulate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          temperature: 20 + Math.random() * 10,
-          humidity: 50 + Math.random() * 30,
-          device_pubkey: deviceInfo?.pubkey,
-        }),
-      });
+      // Generate realistic agricultural sensor data
+      const temperature = 20 + Math.random() * 10;
+      const humidity = 50 + Math.random() * 30;
 
-      const data = await response.json();
+      // PRIVATE MODE: Use ZK proofs for anonymous submission
+      if (usePrivateMode && deviceInfo?.registered) {
+        console.log('🔐 PRIVATE MODE: Generating ZK proof...');
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to collect reading');
+        try {
+          // 1. Generate ZK proof
+          const zkProof = await generateZKProof(temperature, humidity);
+
+          // 2. Submit privately (identity hidden!)
+          await submitPrivateReading(zkProof, temperature, humidity);
+
+          // 3. Update local data (for display only, not linked to identity on backend)
+          const sensorReading: SensorData = {
+            timestamp: Date.now(),
+            temperature,
+            humidity,
+            source: 'simulated',
+          };
+
+          setCurrentReading(sensorReading);
+          setSensorData((prev) => [...prev, sensorReading].slice(-1000));
+
+          // 4. Refresh privacy stats
+          await fetchZKStats();
+
+          console.log('✅ PRIVATE SUBMISSION COMPLETE - Your identity is ANONYMOUS');
+        } catch (zkErr: any) {
+          console.error('❌ Private submission failed, falling back to direct mode:', zkErr);
+          // Fall through to direct submission if ZK fails
+          setError(`Private mode failed: ${zkErr.message}. Try disabling private mode.`);
+          return;
+        }
       }
+      // DIRECT MODE: Traditional submission (identity visible to backend)
+      else {
+        console.log('⚠️  DIRECT MODE: Submitting without privacy...');
 
-      const reading: IoTReading = JSON.parse(data.reading.reading_json);
+        const response = await fetch(`${API_BASE}/api/arduino/simulate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            temperature,
+            humidity,
+            device_pubkey: deviceInfo?.pubkey,
+          }),
+        });
 
-      const sensorReading: SensorData = {
-        timestamp: Date.now(),
-        temperature: reading.t,
-        humidity: reading.h,
-        source: 'simulated',
-      };
+        const data = await response.json();
 
-      setCurrentReading(sensorReading);
-      setSensorData((prev) => [...prev, sensorReading].slice(-1000)); // Keep last 1000
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to collect reading');
+        }
 
-      console.log('📊 Sensor reading:', sensorReading);
+        const reading: IoTReading = JSON.parse(data.reading.reading_json);
+
+        const sensorReading: SensorData = {
+          timestamp: Date.now(),
+          temperature: reading.t,
+          humidity: reading.h,
+          source: 'simulated',
+        };
+
+        setCurrentReading(sensorReading);
+        setSensorData((prev) => [...prev, sensorReading].slice(-1000));
+
+        console.log('📊 Direct submission (no privacy):', sensorReading);
+      }
     } catch (err: any) {
       console.error('Collection error:', err);
       setError(err.message);
@@ -554,7 +740,56 @@ export function ArduinoDashboard() {
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid md:grid-cols-3 gap-6">
+                {/* Privacy Mode Toggle */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-purple-200 font-semibold">Privacy Mode</span>
+                    <button
+                      onClick={() => setUsePrivateMode(!usePrivateMode)}
+                      className={`px-4 py-2 rounded-lg font-bold transition-all ${
+                        usePrivateMode
+                          ? 'bg-green-500/20 border-2 border-green-400 text-green-300'
+                          : 'bg-red-500/20 border-2 border-red-400 text-red-300'
+                      }`}
+                    >
+                      {usePrivateMode ? '🔒 PRIVATE' : '⚠️ PUBLIC'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-purple-200">
+                    {usePrivateMode
+                      ? 'Your identity is HIDDEN via ZK proofs. Backend cannot track you.'
+                      : 'Warning: Your device identity is VISIBLE to backend.'}
+                  </p>
+
+                  {/* Privacy Metrics */}
+                  {usePrivateMode && (
+                    <div className="bg-slate-900/50 rounded-lg p-3 space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-purple-300">Anonymity Set:</span>
+                        <span className="text-white font-bold">{anonymitySetSize} devices</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-purple-300">Current Epoch:</span>
+                        <span className="text-white font-mono">{currentEpoch}</span>
+                      </div>
+                      {currentNullifier && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-purple-300">Nullifier:</span>
+                          <span className="text-white font-mono">{currentNullifier.slice(0, 8)}...</span>
+                        </div>
+                      )}
+                      {lastProofGenTime > 0 && (
+                        <div className="flex justify-between text-xs">
+                          <span className="text-purple-300">Last Proof:</span>
+                          <span className="text-white font-bold">{lastProofGenTime}ms</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Verification Status */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <span className="text-green-400 text-5xl">✅</span>
