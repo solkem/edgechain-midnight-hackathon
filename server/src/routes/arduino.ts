@@ -50,8 +50,8 @@ router.post('/registry/register', (req, res) => {
     const crypto = require('crypto');
     const merkle_leaf_hash = crypto.createHash('sha256').update(device_pubkey).digest('hex');
 
-    // Persist to database with owner_wallet
-    dbService.registerDevice(
+    // Persist to database with owner_wallet (handles already-registered case)
+    const dbResult = dbService.registerDevice(
       device_pubkey,
       owner_wallet,
       collection_mode,
@@ -68,6 +68,7 @@ router.post('/registry/register', (req, res) => {
       owner_wallet,
       global_auto_collection_root: status.global_auto_collection_root,
       global_manual_entry_root: status.global_manual_entry_root,
+      already_registered: dbResult.alreadyRegistered, // Let frontend know if it was already registered
     });
   } catch (error: any) {
     res.status(400).json({ error: error.message });

@@ -65,6 +65,7 @@ export class DatabasePersistenceService {
 
   /**
    * Persist device registration to database
+   * Returns: { alreadyRegistered: boolean, device: DeviceRecord }
    */
   registerDevice(
     device_pubkey: string,
@@ -73,7 +74,23 @@ export class DatabasePersistenceService {
     device_id: string,
     metadata: any,
     merkle_leaf_hash: string
-  ): void {
+  ): { alreadyRegistered: boolean; device: DeviceRecord } {
+    // Check if device already exists
+    const existing = this.getDevice(device_pubkey);
+
+    if (existing) {
+      console.log(`⚠️  Device already registered: ${device_pubkey.slice(0, 16)}...`);
+      console.log(`   Owner: ${existing.owner_wallet}`);
+
+      // Verify ownership
+      if (existing.owner_wallet !== owner_wallet) {
+        throw new Error(`Device ${device_pubkey} is already registered to a different wallet`);
+      }
+
+      return { alreadyRegistered: true, device: existing };
+    }
+
+    // New registration
     const now = Math.floor(Date.now() / 1000);
     const registration_epoch = now;
     const expiry_epoch = now + (86400 * 365); // 1 year
@@ -107,6 +124,10 @@ export class DatabasePersistenceService {
     );
 
     console.log(`✅ Device registered in database: ${device_pubkey.slice(0, 16)}...`);
+
+    // Return the newly created device
+    const newDevice = this.getDevice(device_pubkey)!;
+    return { alreadyRegistered: false, device: newDevice };
   }
 
   /**
