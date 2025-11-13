@@ -117,3 +117,49 @@ CREATE TABLE IF NOT EXISTS transaction_log (
 CREATE INDEX IF NOT EXISTS idx_tx_log_hash ON transaction_log(tx_hash);
 CREATE INDEX IF NOT EXISTS idx_tx_log_type ON transaction_log(tx_type);
 CREATE INDEX IF NOT EXISTS idx_tx_log_status ON transaction_log(status);
+
+-- Nullifier Tracking (for ZK proof double-spend prevention)
+CREATE TABLE IF NOT EXISTS spent_nullifiers (
+  nullifier TEXT NOT NULL,
+  epoch INTEGER NOT NULL,
+  data_hash TEXT NOT NULL,
+  reward REAL NOT NULL,
+  collection_mode TEXT NOT NULL CHECK (collection_mode IN ('auto', 'manual')),
+  spent_at INTEGER DEFAULT (strftime('%s', 'now')),
+  PRIMARY KEY (nullifier, epoch)
+);
+
+CREATE INDEX IF NOT EXISTS idx_spent_nullifiers_epoch ON spent_nullifiers(epoch);
+CREATE INDEX IF NOT EXISTS idx_spent_nullifiers_mode ON spent_nullifiers(collection_mode);
+
+-- Device Secrets (for nullifier generation - HIGHLY SENSITIVE)
+-- NOTE: In production, this should be on device only, never on server!
+-- Including for testing/simulation purposes
+CREATE TABLE IF NOT EXISTS device_secrets (
+  device_pubkey TEXT PRIMARY KEY,
+  device_secret TEXT NOT NULL, -- Used for nullifier generation
+  created_at INTEGER DEFAULT (strftime('%s', 'now')),
+  FOREIGN KEY (device_pubkey) REFERENCES devices(device_pubkey)
+);
+
+-- ZK Proof Submissions (anonymous readings with proofs)
+CREATE TABLE IF NOT EXISTS zk_proof_submissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nullifier TEXT NOT NULL,
+  epoch INTEGER NOT NULL,
+  proof_data TEXT NOT NULL, -- JSON: ZK proof
+  public_inputs TEXT NOT NULL, -- JSON: claimed_root, data_hash, etc.
+  temperature REAL NOT NULL,
+  humidity REAL NOT NULL,
+  timestamp_device INTEGER NOT NULL,
+  collection_mode TEXT NOT NULL CHECK (collection_mode IN ('auto', 'manual')),
+  reward REAL NOT NULL,
+  ipfs_cid TEXT, -- Optional: IPFS storage
+  verified INTEGER DEFAULT 1, -- Boolean: proof verified
+  created_at INTEGER DEFAULT (strftime('%s', 'now')),
+  UNIQUE(nullifier, epoch)
+);
+
+CREATE INDEX IF NOT EXISTS idx_zk_submissions_epoch ON zk_proof_submissions(epoch);
+CREATE INDEX IF NOT EXISTS idx_zk_submissions_mode ON zk_proof_submissions(collection_mode);
+CREATE INDEX IF NOT EXISTS idx_zk_submissions_ipfs ON zk_proof_submissions(ipfs_cid);

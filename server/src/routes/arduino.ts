@@ -8,6 +8,8 @@ import { Router } from 'express';
 import { DeviceRegistryService } from '../services/deviceRegistry';
 import { BLEReceiverService } from '../services/bleReceiver';
 import { DatabasePersistenceService } from '../services/databasePersistence';
+import { DeviceAuthService } from '../services/deviceAuth';
+import { NullifierTrackingService } from '../services/nullifierTracking';
 import { SignedReading } from '../types/arduino';
 // TODO: Re-enable in Phase 3 (Midnight SDK integration)
 // import { deploymentWalletService } from '../services/deploymentWallet';
@@ -16,13 +18,115 @@ const router = Router();
 const registryService = new DeviceRegistryService();
 const bleService = new BLEReceiverService();
 const dbService = new DatabasePersistenceService();
+const authService = new DeviceAuthService();
+const nullifierService = new NullifierTrackingService();
+
+// ============= DEVICE AUTHENTICATION ENDPOINTS =============
+
+/**
+ * POST /api/arduino/auth/request-challenge
+ * Request authentication challenge for device registration
+ * Device must sign this challenge to prove ownership of private key
+ */
+router.post('/auth/request-challenge', (req, res) => {
+  try {
+    const { device_pubkey } = req.body;
+
+    if (!device_pubkey) {
+      return res.status(400).json({ error: 'device_pubkey required' });
+    }
+
+    // Validate pubkey format (64 hex chars = 32 bytes)
+    if (!/^[0-9a-f]{64}$/i.test(device_pubkey)) {
+      return res.status(400).json({ error: 'Invalid device_pubkey format (must be 64 hex chars)' });
+    }
+
+    const challenge = authService.issueChallenge(device_pubkey);
+
+    res.json({
+      success: true,
+      challenge: challenge.challenge,
+      device_pubkey: challenge.devicePubkey,
+      expires_in: 300, // 5 minutes
+    });
+  } catch (error: any) {
+    console.error('Challenge request error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/arduino/auth/verify-signature
+ * Verify device signature on challenge
+ * This proves the device owns the private key corresponding to device_pubkey
+ */
+router.post('/auth/verify-signature', async (req, res) => {
+  try {
+    const { device_pubkey, challenge, signature } = req.body;
+
+    if (!device_pubkey || !challenge || !signature) {
+      return res.status(400).json({ error: 'device_pubkey, challenge, and signature required' });
+    }
+
+    const isValid = await authService.verifyChallenge({
+      devicePubkey: device_pubkey,
+      challenge,
+      signature,
+    });
+
+    if (isValid) {
+      res.json({
+        success: true,
+        authenticated: true,
+        message: 'Device authentication successful',
+      });
+    } else {
+      res.status(401).json({
+        success: false,
+        authenticated: false,
+        error: 'Invalid signature or expired challenge',
+      });
+    }
+  } catch (error: any) {
+    console.error('Signature verification error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/arduino/auth/generate-keypair
+ * Generate ED25519 keypair for testing (DEMO ONLY)
+ * In production, this should ONLY run on the Arduino device!
+ */
+router.post('/auth/generate-keypair', async (req, res) => {
+  try {
+    const keypair = await DeviceAuthService.generateKeypair();
+
+    console.log('⚠️  DEMO: Generated device keypair');
+    console.log('   Public Key:', keypair.publicKey);
+    console.log('   NEVER expose private key in production!');
+
+    res.json({
+      success: true,
+      public_key: keypair.publicKey,
+      private_key: keypair.privateKey, // NEVER expose in production!
+      warning: 'This endpoint is for DEMO purposes only. In production, keypairs must be generated on-device.',
+    });
+  } catch (error: any) {
+    console.error('Keypair generation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============= DEVICE REGISTRATION ENDPOINTS =============
 
 /**
  * POST /api/arduino/registry/register
  * Register a new IoT device with collection mode
  * REQUIRES: owner_wallet (Lace wallet address)
+ * OPTIONAL: authenticated (if true, verifies device signature)
  */
-router.post('/registry/register', (req, res) => {
+router.post('/registry/register', async (req, res) => {
   try {
     const { device_pubkey, owner_wallet, collection_mode = 'auto', device_id, metadata } = req.body;
 
