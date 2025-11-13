@@ -71,7 +71,7 @@ export class IPFSStorageService {
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as any;
         this.initialized = data.ipfs_enabled || false;
 
         if (this.initialized) {
@@ -127,11 +127,11 @@ export class IPFSStorageService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json() as any;
         throw new Error(error.error || `Upload failed: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as any;
 
       console.log(`📤 Uploaded ZK proof to IPFS: ${result.cid}`);
       console.log(`   Nullifier: ${data.public_inputs.nullifier.slice(0, 16)}...`);
@@ -182,11 +182,11 @@ export class IPFSStorageService {
       });
 
       if (!response.ok) {
-        const error = await response.json();
+        const error = await response.json() as any;
         throw new Error(error.error || `Upload failed: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as any;
       console.log(`📤 Uploaded signed reading to IPFS: ${result.cid}`);
 
       return result.cid;
@@ -218,7 +218,7 @@ export class IPFSStorageService {
         throw new Error(`Retrieval failed: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as any;
 
       if (result.success) {
         console.log(`📥 Retrieved ZK proof from IPFS: ${cid}`);
