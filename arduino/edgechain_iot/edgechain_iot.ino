@@ -1,11 +1,15 @@
 /**
- * EdgeChain IoT Demo - Arduino Nano BLE Sense
+ * EdgeChain IoT Demo - Arduino Nano BLE Sense / Sense Rev2
  *
  * Collects temperature/humidity data, signs with EdDSA, broadcasts via BLE
  * For live demo with real hardware + ZK proofs
+ *
+ * Compatible with both:
+ * - Original Sense (HTS221 sensor)
+ * - Sense Rev2 (HS300x sensor)
  */
 
-#include <Arduino_HTS221.h>  // Temperature + Humidity sensor
+#include <Arduino_HS300x.h>  // Temperature + Humidity sensor (Rev2)
 #include <ArduinoBLE.h>      // Bluetooth LE
 #include <Ed25519.h>         // EdDSA signing (lightweight)
 #include <SHA256.h>          // Hash function
@@ -35,25 +39,79 @@ BLECharacteristic dataCharacteristic(DATA_CHAR_UUID, BLERead | BLENotify, 256);
 
 void setup() {
   Serial.begin(115200);
-  delay(1000);
+  while (!Serial);  // CRITICAL: Wait for Serial port to connect (like reference code)
 
+  Serial.println();
+  Serial.println("===========================================");
   Serial.println("=== EdgeChain Arduino IoT Demo ===");
-  Serial.println("Initializing...");
+  Serial.println("===========================================");
+  Serial.println();
+  Serial.flush(); // Ensure this prints
 
-  // 1. Initialize sensors
-  if (!HTS.begin()) {
-    Serial.println("ERROR: HTS221 sensor failed");
-    while (1);
+  Serial.println("[1/4] Deriving device keys...");
+  Serial.flush();
+
+  // 1. Derive device public key FIRST (doesn't depend on hardware)
+  Ed25519::derivePublicKey(device_public_key, device_secret_key);
+  Serial.println("✓ Device keys derived");
+  printHex("Device Public Key: ", device_public_key, 32);
+  Serial.println();
+  Serial.flush();
+
+  Serial.println("[2/4] Initializing HS300x sensor (Rev2)...");
+  Serial.flush();
+
+  // 2. Initialize sensors (with multiple retry attempts)
+  bool sensor_ok = false;
+  for (int i = 0; i < 3; i++) {
+    Serial.print("   Attempt ");
+    Serial.print(i + 1);
+    Serial.print("/3... ");
+    Serial.flush();
+
+    delay(100); // Give sensor time to stabilize
+
+    if (HS300x.begin()) {
+      Serial.println("SUCCESS!");
+      sensor_ok = true;
+      break;
+    } else {
+      Serial.println("failed");
+      delay(500); // Wait before retry
+    }
   }
 
-  // 2. Derive device public key from secret key
-  Ed25519::derivePublicKey(device_public_key, device_secret_key);
-  printHex("Device Public Key: ", device_public_key, 32);
+  if (!sensor_ok) {
+    Serial.println();
+    Serial.println("⚠ ERROR: HS300x sensor initialization failed after 3 attempts");
+    Serial.println("   Possible causes:");
+    Serial.println("   - Sensor not properly connected (built-in on Nano 33 BLE Sense Rev2)");
+    Serial.println("   - I2C bus issue");
+    Serial.println("   - Wrong board selected (must be Arduino Nano 33 BLE)");
+    Serial.println("   - Missing library: Install 'Arduino_HS300x' from Library Manager");
+    Serial.println();
+    Serial.println("   STOPPING - Cannot collect real data without sensor");
+    Serial.flush();
+    while (1) {
+      delay(1000);
+    }
+  }
+
+  Serial.println("✓ HS300x sensor initialized successfully");
+  Serial.flush();
+  Serial.println();
+
+  Serial.println("[3/4] Initializing BLE...");
+  Serial.flush();
 
   // 3. Initialize BLE
   if (!BLE.begin()) {
-    Serial.println("ERROR: BLE failed");
-    while (1);
+    Serial.println("ERROR: BLE initialization failed");
+    Serial.println("Cannot continue without BLE");
+    Serial.flush();
+    while (1) {
+      delay(1000);
+    }
   }
 
   BLE.setLocalName("EdgeChain-Demo");
@@ -62,8 +120,18 @@ void setup() {
   BLE.addService(edgechainService);
   BLE.advertise();
 
+  Serial.println("✓ BLE initialized");
+  Serial.println();
+  Serial.flush();
+
+  Serial.println("[4/4] Starting BLE advertising...");
+  Serial.println("===========================================");
+  Serial.println("✓ Setup complete!");
   Serial.println("✓ BLE advertising as 'EdgeChain-Demo'");
   Serial.println("✓ Waiting for gateway connection...");
+  Serial.println("===========================================");
+  Serial.println();
+  Serial.flush();
 }
 
 void loop() {
@@ -92,9 +160,9 @@ void loop() {
  * Collect temperature/humidity, sign, and broadcast via BLE
  */
 void collectAndSignReading() {
-  // 1. Read sensors
-  float temperature = HTS.readTemperature();
-  float humidity = HTS.readHumidity();
+  // 1. Read sensors (HS300x for Rev2)
+  float temperature = HS300x.readTemperature();
+  float humidity = HS300x.readHumidity();
   unsigned long timestamp = millis() / 1000; // seconds since boot
 
   Serial.println("\n--- New Reading ---");

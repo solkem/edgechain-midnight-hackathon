@@ -1,0 +1,17 @@
+{
+  "name": "edgechain-ipfs-service",
+  "version": "1.0.0",
+  "description": "IPFS storage microservice for EdgeChain (ESM-based)",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs",
+    "dev": "node --watch index.mjs"
+  },
+  "dependencies": {
+    "@storacha/client": "^1.8.15",
+    "@ucanto/principal": "^9.0.1",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}
