@@ -315,11 +315,17 @@ export function ArduinoDashboard() {
         merkleRoot: data.global_auto_collection_root,
       });
 
-      console.log('✅ Device registered:', data);
-      console.log(`   Owner wallet: ${wallet.address}`);
-      console.log(`   Device pubkey: ${devicePubkey}`);
+      if (data.already_registered) {
+        console.log('✅ Device already registered (loading existing data)');
+        console.log(`   Owner wallet: ${wallet.address}`);
+        console.log(`   Device pubkey: ${devicePubkey}`);
+      } else {
+        console.log('✅ Device registered (new)');
+        console.log(`   Owner wallet: ${wallet.address}`);
+        console.log(`   Device pubkey: ${devicePubkey}`);
+      }
 
-      // Fetch initial device data
+      // Fetch device data (works for both new and existing registrations)
       await fetchDeviceData();
     } catch (err: any) {
       console.error('Registration error:', err);
