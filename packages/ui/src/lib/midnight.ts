@@ -73,14 +73,14 @@ export async function deployEdgeChainContract(
   console.log(`   Contract size: ${(contractBytecode.byteLength / 1024).toFixed(2)} KB`);
 
   try {
-    // Enable wallet if not already enabled
-    const enabledWallet = await walletApi.enable();
-    console.log('✅ Wallet enabled');
+    // walletApi is already enabled by WalletProvider.connectWallet()
+    // No need to call .enable() again
+    console.log('✅ Using already-enabled Midnight API from WalletProvider');
 
     // TODO: Use Midnight.js deployment API when available
     // For now, this is a placeholder
     // Real implementation will be something like:
-    // const deployment = await deployContract(enabledWallet, contractBytecode);
+    // const deployment = await deployContract(walletApi, contractBytecode);
     // return deployment.contractAddress;
 
     throw new Error(
