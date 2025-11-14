@@ -111,6 +111,8 @@ export function ArduinoDashboard() {
   const [zkProofStats, setZkProofStats] = useState<any>(null);
   const [lastProofGenTime, setLastProofGenTime] = useState<number>(0);
   const [anonymitySetSize, setAnonymitySetSize] = useState<number>(0);
+  const [lastRewardNotification, setLastRewardNotification] = useState<number>(0);
+  const [accumulatedRewards, setAccumulatedRewards] = useState<number>(0);
 
   // Auto-collect sensor data every 30 seconds when active
   useEffect(() => {
@@ -659,12 +661,21 @@ export function ArduinoDashboard() {
             console.log(`   Reward distributed: ${submitResult.reward_amount} tDUST`);
             console.log(`   Transaction: ${submitResult.tx_hash || 'pending'}`);
 
-            // Show success notification with reward amount
-            setError(null);
-            setSuccess(`🎉 +${submitResult.reward_amount} tDUST earned! Reading verified & stored on IPFS.`);
+            // Accumulate rewards and show notification every 60 seconds
+            const now = Date.now();
+            const timeSinceLastNotification = now - lastRewardNotification;
+            const newAccumulated = accumulatedRewards + (submitResult.reward_amount || 0);
+            setAccumulatedRewards(newAccumulated);
 
-            // Clear success message after 3 seconds
-            setTimeout(() => setSuccess(null), 3000);
+            if (timeSinceLastNotification >= 60000) { // 60 seconds
+              setError(null);
+              setSuccess(`🎉 +${newAccumulated.toFixed(2)} tDUST earned! Readings verified & stored on IPFS.`);
+              setLastRewardNotification(now);
+              setAccumulatedRewards(0); // Reset accumulator
+
+              // Clear success message after 3 seconds
+              setTimeout(() => setSuccess(null), 3000);
+            }
           } else {
             console.warn('⚠️ Reading submission failed:', submitResult.error);
             setError(`Failed to submit reading: ${submitResult.error}`);
