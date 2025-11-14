@@ -635,8 +635,36 @@ export function ArduinoDashboard() {
         setCurrentReading(sensorReading);
         setSensorData((prev) => [...prev, sensorReading].slice(-1000)); // Keep last 1000
 
-        // TODO: Submit reading to backend with signature verification
-        // TODO: Generate ZK proof if privacy mode enabled
+        // Submit reading to backend for real-time reward distribution
+        try {
+          const submitResponse = await fetch(`${API_BASE}/api/arduino/readings/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              device_pubkey: reading.device_pubkey,
+              reading: reading.reading_json,
+              signature: reading.signature,
+              owner_wallet: wallet.address,
+              collection_mode: 'auto',
+            }),
+          });
+
+          const submitResult = await submitResponse.json();
+
+          if (submitResult.success) {
+            console.log('✅ Reading submitted successfully');
+            console.log(`   IPFS CID: ${submitResult.ipfs_cid}`);
+            console.log(`   Reward distributed: ${submitResult.reward_amount} tDUST`);
+            console.log(`   Transaction: ${submitResult.tx_hash || 'pending'}`);
+
+            // Update UI with reward notification
+            // TODO: Add toast notification showing "+0.1 tDUST earned!"
+          } else {
+            console.warn('⚠️ Reading submission failed:', submitResult.error);
+          }
+        } catch (err) {
+          console.error('❌ Failed to submit reading:', err);
+        }
       });
 
       setIsCollecting(true);
