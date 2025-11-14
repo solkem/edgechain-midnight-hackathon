@@ -255,17 +255,34 @@ export class DatabasePersistenceService {
     const first_reading_at = readings[0].created_at;
     const last_reading_at = readings[readings.length - 1].created_at;
 
-    // Expected: 1 reading every 30 seconds = 2 per minute = 120 per hour = 2880 per 24 hours
-    // Balanced for demo (visible progress in 3 min) + realistic for agriculture IoT
-    // But only count from first reading to now (in case they just registered)
-    const seconds_elapsed = now - first_reading_at;
-    const expected_readings = Math.floor(seconds_elapsed / 30);
+    // Time-window based uptime calculation with gap detection
+    // Expected: 1 reading every 30 seconds = 2 per minute = 120 per hour
+    // Gap threshold: 120 seconds (4x reading interval) - anything longer is considered "offline"
 
+    const READING_INTERVAL = 30; // seconds
+    const GAP_THRESHOLD = 120; // 2 minutes - if gap is longer, don't count it as expected readings
+
+    let total_active_time = 0; // Total time device was actively collecting
+
+    for (let i = 0; i < readings.length; i++) {
+      const current_time = readings[i].created_at;
+      const next_time = i < readings.length - 1 ? readings[i + 1].created_at : now;
+      const gap = next_time - current_time;
+
+      if (gap <= GAP_THRESHOLD) {
+        // Device was active during this period
+        total_active_time += gap;
+      }
+      // If gap > threshold, device was offline - don't count this time
+    }
+
+    // Calculate expected readings based only on active collection time
+    const expected_readings = Math.floor(total_active_time / READING_INTERVAL);
     const total_readings = readings.length;
     const missed_readings = Math.max(0, expected_readings - total_readings);
     const uptime_percent = expected_readings > 0
       ? Math.min(100, (total_readings / expected_readings) * 100)
-      : 0;
+      : 100; // If we have readings but expected is 0, give 100%
 
     return {
       device_pubkey,

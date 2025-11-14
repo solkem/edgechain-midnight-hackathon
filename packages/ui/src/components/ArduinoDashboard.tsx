@@ -203,20 +203,48 @@ export function ArduinoDashboard() {
       };
     }
 
-    // Fallback: Calculate from local session data
-    const hoursElapsed = sensorData.length > 0
-      ? (Date.now() - sensorData[0].timestamp) / (1000 * 60 * 60)
-      : 0;
+    // Fallback: Calculate from local session data with gap detection
+    // Time-window based uptime - only count active collection periods
 
-    // Expected: 1 reading every 30 seconds = 2 per minute = 120 per hour
-    // Balanced for demo (visible progress in 3 min) + realistic for agriculture IoT
-    const expectedReadings = Math.floor(hoursElapsed * 120);
+    const READING_INTERVAL = 30; // seconds
+    const GAP_THRESHOLD = 120; // 2 minutes - if gap is longer, device was offline
+
+    let totalActiveTime = 0; // Total time device was actively collecting (ms)
+
+    if (sensorData.length > 0) {
+      const now = Date.now();
+
+      for (let i = 0; i < sensorData.length; i++) {
+        const currentTime = sensorData[i].timestamp;
+        const nextTime = i < sensorData.length - 1 ? sensorData[i + 1].timestamp : now;
+        const gap = (nextTime - currentTime) / 1000; // Convert to seconds
+
+        if (gap <= GAP_THRESHOLD) {
+          // Device was active during this period
+          totalActiveTime += (nextTime - currentTime);
+        }
+        // If gap > threshold, device was offline - don't count this time
+      }
+    }
+
+    const activeTimeSeconds = totalActiveTime / 1000;
+    const expectedReadings = Math.floor(activeTimeSeconds / READING_INTERVAL);
     const collectedReadings = sensorData.length;
     const missedReadings = Math.max(0, expectedReadings - collectedReadings);
     const uptimePercent = expectedReadings > 0
       ? Math.min(100, (collectedReadings / expectedReadings) * 100)
-      : 0;
+      : (collectedReadings > 0 ? 100 : 0); // If we have readings but expected is 0, give 100%
 
+    // Debug logging for uptime calculation
+    if (sensorData.length > 0 && sensorData.length % 5 === 0) {
+      console.log('📊 Uptime Calculation (Time-Window Based):');
+      console.log(`   Active collection time: ${(activeTimeSeconds / 60).toFixed(2)} minutes`);
+      console.log(`   Collected: ${collectedReadings} readings`);
+      console.log(`   Expected: ${expectedReadings} readings (during active periods only)`);
+      console.log(`   Uptime: ${uptimePercent.toFixed(1)}%`);
+    }
+
+    const hoursElapsed = totalActiveTime / (1000 * 60 * 60);
     const perfectDayStreak = uptimePercent > 99 ? Math.floor(hoursElapsed / 24) : 0;
 
     return {
