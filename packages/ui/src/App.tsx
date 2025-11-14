@@ -479,20 +479,6 @@ function Login({
             </div>
           )}
 
-          {/* Show success message if contract is deployed */}
-          {contractContext.isDeployed && contractContext.contractAddress && (
-            <div className="mb-6 p-4 bg-green-900/30 border border-green-500/50 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-green-400 text-2xl">✅</span>
-                <p className="text-green-300 font-semibold">Contract Deployed!</p>
-              </div>
-              <p className="text-green-100 text-xs font-mono break-all">
-                {contractContext.contractAddress}
-              </p>
-              <p className="text-green-200 text-sm mt-2">You can now connect and start training</p>
-            </div>
-          )}
-
           {/* Show error message if connection failed */}
           {error && (
             <div className="mb-4 p-4 bg-red-900/50 border border-red-500/50 rounded-lg">
