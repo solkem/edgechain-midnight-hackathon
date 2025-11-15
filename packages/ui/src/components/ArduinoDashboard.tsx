@@ -126,7 +126,7 @@ export function ArduinoDashboard() {
   const [zkProofStats, setZkProofStats] = useState<any>(null);
   const [lastProofGenTime, setLastProofGenTime] = useState<number>(0);
   const [anonymitySetSize, setAnonymitySetSize] = useState<number>(0);
-  const [lastRewardNotification, setLastRewardNotification] = useState<number>(0);
+  const [lastRewardNotification, setLastRewardNotification] = useState<number>(Date.now());
   const [accumulatedRewards, setAccumulatedRewards] = useState<number>(0);
 
   // Auto-collect sensor data every 30 seconds when active
