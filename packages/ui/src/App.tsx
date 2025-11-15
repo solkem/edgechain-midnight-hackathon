@@ -6,6 +6,8 @@ import { useWallet } from './providers/WalletProvider';
 import { useContract } from './providers/ContractProvider';
 // Import the real FL Dashboard component with working training functionality
 import { FLDashboard as FLDashboardComponent } from './components/FLDashboard';
+// Import the NEW privacy-preserving FL Dashboard
+import { PrivacyFLDashboard } from './components/PrivacyFLDashboard';
 // Import the Arduino IoT Dashboard component
 import { ArduinoDashboard } from './components/ArduinoDashboard';
 
@@ -139,6 +141,7 @@ export default function EdgeChainApp() {
           <Route path="/selection" element={<SelectionRoute />} />
           <Route path="/arduino" element={<ArduinoRoute />} />
           <Route path="/train" element={<TrainRoute />} />
+          <Route path="/train-privacy" element={<PrivacyTrainRoute />} />
           <Route path="/aggregation" element={<AggregationRoute />} />
           <Route path="/predictions" element={<PredictionsRoute />} />
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -296,6 +299,17 @@ function TrainRoute() {
   // Use the real FL Dashboard component with working training functionality
   // It gets wallet and contract context from providers automatically
   return <FLDashboardComponent />;
+}
+
+function PrivacyTrainRoute() {
+  const { farmer, wallet } = useAppContext();
+
+  if (!farmer || !wallet) {
+    return <Navigate to="/" replace />;
+  }
+
+  // Use the NEW privacy-preserving FL Dashboard
+  return <PrivacyFLDashboard />;
 }
 
 function AggregationRoute() {
@@ -793,21 +807,27 @@ function Selection({ farmer, onFL, onAI, onDisconnect }: { farmer: Farmer; onFL:
         <div className="text-center mb-12">
           <h2 className="text-2xl font-bold text-white mb-3">What would you like to do today?</h2>
         </div>
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          <button onClick={() => navigate('/arduino')} className="bg-slate-800/60 border-2 border-teal-500/30 hover:border-teal-500 rounded-2xl p-8 text-left transition-all transform hover:scale-105">
-            <div className="w-16 h-16 bg-teal-600/40 rounded-full mb-4 flex items-center justify-center text-4xl">🌡️</div>
-            <h3 className="text-2xl font-bold text-white mb-2">Arduino IoT</h3>
-            <p className="text-purple-200 text-sm">Collect sensor data from your farm for training</p>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+          <button onClick={() => navigate('/arduino')} className="bg-slate-800/60 border-2 border-teal-500/30 hover:border-teal-500 rounded-2xl p-6 text-left transition-all transform hover:scale-105">
+            <div className="w-14 h-14 bg-teal-600/40 rounded-full mb-3 flex items-center justify-center text-3xl">🌡️</div>
+            <h3 className="text-xl font-bold text-white mb-2">Arduino IoT</h3>
+            <p className="text-purple-200 text-xs">Collect sensor data from your farm</p>
           </button>
-          <button onClick={onFL} className="bg-slate-800/60 border-2 border-purple-500/30 hover:border-purple-500 rounded-2xl p-8 text-left transition-all transform hover:scale-105">
-            <div className="w-16 h-16 bg-purple-600/40 rounded-full mb-4 flex items-center justify-center text-4xl">⚙️</div>
-            <h3 className="text-2xl font-bold text-white mb-2">FL Training</h3>
-            <p className="text-purple-200 text-sm">Download models, train locally, submit updates with ZK-proofs</p>
+          <button onClick={onFL} className="bg-slate-800/60 border-2 border-purple-500/30 hover:border-purple-500 rounded-2xl p-6 text-left transition-all transform hover:scale-105">
+            <div className="w-14 h-14 bg-purple-600/40 rounded-full mb-3 flex items-center justify-center text-3xl">⚙️</div>
+            <h3 className="text-xl font-bold text-white mb-2">FL Training</h3>
+            <p className="text-purple-200 text-xs">Standard federated learning</p>
           </button>
-          <button onClick={onAI} className="bg-slate-800/60 border-2 border-green-500/30 hover:border-green-500 rounded-2xl p-8 text-left transition-all transform hover:scale-105">
-            <div className="w-16 h-16 bg-green-600/40 rounded-full mb-4 flex items-center justify-center text-4xl">🌾</div>
-            <h3 className="text-2xl font-bold text-white mb-2">AI Predictions</h3>
-            <p className="text-purple-200 text-sm">Get SMS predictions, vote on accuracy, track your impact</p>
+          <button onClick={() => navigate('/train-privacy')} className="bg-slate-800/60 border-2 border-pink-500/30 hover:border-pink-500 rounded-2xl p-6 text-left transition-all transform hover:scale-105 relative">
+            <div className="absolute top-2 right-2 bg-pink-600 text-white text-xs px-2 py-1 rounded-full font-bold">NEW</div>
+            <div className="w-14 h-14 bg-pink-600/40 rounded-full mb-3 flex items-center justify-center text-3xl">🔐</div>
+            <h3 className="text-xl font-bold text-white mb-2">Privacy FL</h3>
+            <p className="text-purple-200 text-xs">4-tier privacy architecture</p>
+          </button>
+          <button onClick={onAI} className="bg-slate-800/60 border-2 border-green-500/30 hover:border-green-500 rounded-2xl p-6 text-left transition-all transform hover:scale-105">
+            <div className="w-14 h-14 bg-green-600/40 rounded-full mb-3 flex items-center justify-center text-3xl">🌾</div>
+            <h3 className="text-xl font-bold text-white mb-2">AI Predictions</h3>
+            <p className="text-purple-200 text-xs">Get SMS predictions & vote</p>
           </button>
         </div>
       </div>
