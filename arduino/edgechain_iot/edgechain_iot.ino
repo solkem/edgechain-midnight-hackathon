@@ -99,7 +99,7 @@ void generateDeviceKeys() {
 
 void setup() {
   Serial.begin(115200);
-  while (!Serial);  // Wait for Serial port to connect
+  delay(1000);  // Brief delay to allow serial to initialize if connected
 
   Serial.println();
   Serial.println("===========================================");
@@ -174,7 +174,8 @@ void setup() {
   char bleName[32];
   snprintf(bleName, sizeof(bleName), "EdgeChain-%02X%02X",
            device_public_key[0], device_public_key[1]);
-  BLE.setLocalName(bleName);
+  BLE.setDeviceName(bleName);  // Set device name (shows in scan)
+  BLE.setLocalName(bleName);   // Set local name (for connection)
   BLE.setAdvertisedService(edgechainService);
   edgechainService.addCharacteristic(dataCharacteristic);
   BLE.addService(edgechainService);
