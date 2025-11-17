@@ -72,13 +72,14 @@ export class IPFSStorageService {
 
       if (response.ok) {
         const data = await response.json() as any;
-        this.initialized = data.ipfs_enabled || false;
+        // Mark as initialized even in mock mode - service is available
+        this.initialized = true;
 
-        if (this.initialized) {
-          console.log('✅ IPFS Storage Service: Connected to microservice');
+        if (data.ipfs_enabled) {
+          console.log('✅ IPFS Storage Service: Connected to microservice (real IPFS)');
           console.log(`   Service URL: ${this.ipfsServiceUrl}`);
         } else {
-          console.log('⚠️  IPFS microservice in mock mode (no credentials)');
+          console.log('✅ IPFS Storage Service: Connected to microservice (mock mode)');
           console.log('   Will generate mock CIDs for demo purposes');
         }
       } else {
