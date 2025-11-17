@@ -224,7 +224,7 @@
 
 ---
 
-### **LOKI - Frontend + FL UI Lead** (Remote Support)
+### **LOKI - Frontend + UI Lead** (Remote Support)
 
 **🎯 MISSION**: Polish UI, add client-side proof generation, make FL demo shine
 
@@ -398,8 +398,6 @@
 
 ---
 
----
-
 ## ⏰ HACKATHON WAR ROOM SCHEDULE
 
 ### **MONDAY, NOVEMBER 17 - Integration Day**
@@ -565,12 +563,12 @@
 
 **Why We Win:**
 
-1. **Only Team with Real Hardware Demo** 🔧
+1. **(Probably) Only Team with Real Hardware Demo** 🔧
    - Most teams will show slides/mockups
    - We have working Arduino transmitting LIVE sensor data
    - Judges love tangible demos
 
-2. **Most Comprehensive Midnight Integration** ⛓️
+2. **(Probably) Most Comprehensive Midnight Integration** ⛓️
    - Real ZK proofs (not mocks)
    - Actual contract deployment on testnet
    - Full DApp Connector integration
