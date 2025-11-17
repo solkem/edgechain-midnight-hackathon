@@ -352,7 +352,7 @@
 
 **Morning (9am-12pm): Pitch Development**
 - [ ] **Create Winning Pitch Deck** (2 hours)
-  - **Slide 1**: Problem - Data privacy crisis in African agriculture
+  - **Slide 1**: Problem - Data privacy crisis in P2P Farming Cooperatives
   - **Slide 2**: Solution - EdgeChain's 4-layer privacy architecture on Midnight
   - **Slide 3**: Live Demo - Hardware + ZK proofs + FL aggregation
   - **Slide 4**: Impact - Real farmers, real incentives, real privacy
@@ -395,12 +395,6 @@
   - Review technical FAQ answers
   - Practice handling judge interruptions
   - Finalize speaking order
-
-- [ ] **Equipment Check** (1 hour)
-  - Test projector/screen compatibility
-  - Verify internet connectivity backup (phone hotspot)
-  - Charge all devices to 100%
-  - Print pitch deck as backup
 
 ---
 
