@@ -1257,9 +1257,9 @@ export function ArduinoDashboard() {
             </details>
 
             {/* PRIORITY 2 & 3: CONSISTENCY + INCENTIVES */}
-            <div className="grid gap-6 md:grid-cols-2">
-              {/* CONSISTENCY SCORE */}
-              <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="grid gap-6 md:grid-cols-1">
+              {/* CONSISTENCY SCORE - HIDDEN */}
+              {/* <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                 <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
                   <span>📊</span> Data Collection Consistency
                 </div>
@@ -1308,7 +1308,7 @@ export function ArduinoDashboard() {
                     </div>
                   )}
                 </div>
-              </div>
+              </div> */}
 
               {/* tDUST INCENTIVES */}
               <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
