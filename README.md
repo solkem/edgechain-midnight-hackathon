@@ -10,7 +10,7 @@ EdgeChain is a decentralized federated learning platform that brings AI-powered 
 - **Contract Address**: `02001d6243d08ba466d6a3e32d9a04dd1d283d8fe2b9714cde81a25fa9081087b30a`
 - **Network**: Midnight Testnet (testnet-02)
 - **Deployed**: 2025-11-18T01:00:50.279Z
-- **Explorer**: [View on Midnight Explorer](https://explorer.testnet.midnight.network/contract/02001d6243d08ba466d6a3e32d9a04dd1d283d8fe2b9714cde81a25fa9081087b30a)
+- **Deployment Proof**: See [deployment.json](packages/contract/deployment.json) for verified deployment details
 
 **Features Enabled**:
 - ✅ Dual Merkle roots (auto/manual collection modes)
@@ -1045,8 +1045,9 @@ yarn start:production
 - 🔧 **[Arduino Troubleshooting](private-docs/ARDUINO_TOOLCHAIN_FIX.md)** - Common issues and fixes for Arduino IDE
 
 **Live Deployment**:
-- 🎉 **[Arduino IoT Contract](https://explorer.testnet.midnight.network/contract/02001d6243d08ba466d6a3e32d9a04dd1d283d8fe2b9714cde81a25fa9081087b30a)** - Live contract on Midnight Explorer
-- 📝 **[Deployment Details](packages/contract/deployment.json)** - Contract addresses and deployment configuration
+- 📝 **[Deployment Details](packages/contract/deployment.json)** - Verified contract addresses and deployment configuration
+- 🎉 **Contract Address**: `02001d6243d08ba466d6a3e32d9a04dd1d283d8fe2b9714cde81a25fa9081087b30a` (Midnight Testnet testnet-02)
+- ⚙️ **Alternative Explorers**: [Nocturne Explorer](https://midnight-explorer-sand.vercel.app) (community-built, limited functionality)
 
 ### External Resources
 - [Midnight Network Docs](https://docs.midnight.network/)
