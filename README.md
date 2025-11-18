@@ -41,7 +41,7 @@ EdgeChain is a decentralized federated learning platform that brings AI-powered 
 ### **"One Among Thousands"**
 *IoT Contract - Anonymity Set ZK Proofs*
 
-**Hide in the crowd.** Every device anonymous among 10,000+ others. Privacy that grows with every farmer who joins.
+**Hide in the crowd.** Every device anonymous among 10,000+ others. Privacy that grows with every IoT Kit that joins.
 
 ---
 
