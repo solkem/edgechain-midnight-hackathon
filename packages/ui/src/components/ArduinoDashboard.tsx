@@ -94,6 +94,10 @@ console.log('🔧 API_BASE Configuration:', {
   resolved_API_BASE: API_BASE,
 });
 
+// LocalStorage keys for persistent BLE pairing
+const BLE_DEVICE_ID_KEY = 'edgechain_ble_device_id';
+const BLE_DEVICE_NAME_KEY = 'edgechain_ble_device_name';
+
 export function ArduinoDashboard() {
   const wallet = useWallet();
   const navigate = useNavigate();
@@ -638,6 +642,22 @@ export function ArduinoDashboard() {
     }
   }, [deviceInfo?.registered]);
 
+  // Auto-reconnect to previously paired device on component mount
+  useEffect(() => {
+    const autoConnect = async () => {
+      // Only attempt auto-reconnect if:
+      // 1. Wallet is connected
+      // 2. Not currently collecting data
+      // 3. Device not already registered
+      if (wallet.isConnected && !isCollecting && !deviceInfo?.registered) {
+        console.log('🔄 Checking for previously paired devices...');
+        await attemptAutoReconnect();
+      }
+    };
+
+    autoConnect();
+  }, [wallet.isConnected]); // Run when wallet connection changes
+
   /**
    * Check if device is registered, and auto-register if not
    */
@@ -728,11 +748,200 @@ export function ArduinoDashboard() {
   };
 
   /**
+   * Setup BLE listeners after connection (shared logic)
+   */
+  const setupBLEListeners = async (device: any, characteristic: any) => {
+    // Store device info in localStorage for auto-reconnect
+    localStorage.setItem(BLE_DEVICE_ID_KEY, device.id);
+    localStorage.setItem(BLE_DEVICE_NAME_KEY, device.name || 'EdgeChain IoT Kit');
+    console.log(`💾 Saved device to localStorage: ${device.name} (${device.id})`);
+
+    // Track if we've registered the device yet
+    let deviceRegistered = false;
+
+    const BLE_SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
+
+    // Listen for sensor readings
+    characteristic.addEventListener('characteristicvaluechanged', async (event: any) => {
+      const buffer = event.target.value.buffer;
+      const reading = parseIoTPayload(buffer);
+
+      console.log('📊 BLE reading received:', {
+        temperature: reading.t,
+        humidity: reading.h,
+        device: reading.device_pubkey?.slice(0, 16) + '...',
+      });
+
+      // Auto-register device on first reading
+      if (!deviceRegistered && reading.device_pubkey) {
+        console.log('🔐 First reading from device, checking registration...');
+        deviceRegistered = await checkAndRegisterDevice(reading.device_pubkey);
+
+        if (!deviceRegistered) {
+          console.error('❌ Failed to register device, skipping reading');
+          return;
+        }
+      }
+
+      // Store reading in local state
+      const sensorReading: SensorData = {
+        timestamp: Date.now(),
+        temperature: reading.t,
+        humidity: reading.h,
+        source: 'iot-kit',
+      };
+
+      setCurrentReading(sensorReading);
+      setSensorData((prev) => [...prev, sensorReading].slice(-1000)); // Keep last 1000
+
+      // Submit reading to backend for real-time reward distribution
+      try {
+        const submitResponse = await fetch(`${API_BASE}/api/arduino/readings/submit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            device_pubkey: reading.device_pubkey,
+            reading: reading.reading_json,
+            signature: reading.signature,
+            owner_wallet: wallet.address,
+            collection_mode: 'auto',
+          }),
+        });
+
+        const submitResult = await submitResponse.json();
+
+        if (submitResult.success) {
+          console.log('✅ Reading submitted successfully');
+          console.log(`   IPFS CID: ${submitResult.ipfs_cid}`);
+          console.log(`   Reward distributed: ${submitResult.reward_amount} tDUST`);
+          console.log(`   Transaction: ${submitResult.tx_hash || 'pending'}`);
+
+          // Accumulate rewards and show notification every 60 seconds
+          const now = Date.now();
+          const timeSinceLastNotification = now - lastRewardNotification;
+          const newAccumulated = accumulatedRewards + (submitResult.reward_amount || 0);
+          setAccumulatedRewards(newAccumulated);
+
+          // DISABLED: Reward notifications temporarily disabled
+          // Accumulate rewards silently in console logs only
+          console.log(`⏱️  Reward notification (DISABLED):`);
+          console.log(`   Time since last: ${(timeSinceLastNotification / 1000).toFixed(1)}s`);
+          console.log(`   Accumulated: ${newAccumulated.toFixed(2)} tDUST`);
+          console.log(`   Notification: DISABLED (check console for rewards)`);
+
+          // Update accumulator but don't show notification
+          if (timeSinceLastNotification >= 60000) {
+            setLastRewardNotification(now);
+            setAccumulatedRewards(0); // Reset accumulator
+            console.log(`   💰 Total earned in last 60s: ${newAccumulated.toFixed(2)} tDUST (notification disabled)`);
+          }
+
+          // COMMENTED OUT: Annoying notification
+          // if (timeSinceLastNotification >= 60000) { // 60 seconds
+          //   setError(null);
+          //   setSuccess(`🎉 +${newAccumulated.toFixed(2)} tDUST earned! Readings verified & stored on IPFS.`);
+          //   setLastRewardNotification(now);
+          //   setAccumulatedRewards(0); // Reset accumulator
+          //   console.log(`   ✅ SHOWING NOTIFICATION`);
+          //   setTimeout(() => setSuccess(null), 3000);
+          // }
+        } else {
+          console.warn('⚠️ Reading submission failed:', submitResult.error);
+          setError(`Failed to submit reading: ${submitResult.error}`);
+        }
+      } catch (err) {
+        console.error('❌ Failed to submit reading:', err);
+      }
+    });
+
+    setIsCollecting(true);
+    console.log('✓ Connected to IoT Kit, listening for readings...');
+  };
+
+  /**
+   * Attempt to auto-reconnect to previously paired device
+   */
+  const attemptAutoReconnect = async (): Promise<boolean> => {
+    try {
+      const savedDeviceId = localStorage.getItem(BLE_DEVICE_ID_KEY);
+      const savedDeviceName = localStorage.getItem(BLE_DEVICE_NAME_KEY);
+
+      if (!savedDeviceId) {
+        console.log('ℹ️ No previously paired device found');
+        return false;
+      }
+
+      console.log(`🔄 Attempting to reconnect to: ${savedDeviceName} (${savedDeviceId})`);
+
+      const BLE_SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
+      const DATA_CHAR_UUID = '87654321-4321-8765-4321-fedcba987654';
+
+      // Check if Web Bluetooth API supports getDevices()
+      if (!(navigator as any).bluetooth?.getDevices) {
+        console.log('⚠️ Browser does not support getDevices() - auto-reconnect not available');
+        return false;
+      }
+
+      // Get list of previously paired devices
+      const devices = await (navigator as any).bluetooth.getDevices();
+      console.log(`📱 Found ${devices.length} previously paired device(s)`);
+
+      // Find our saved device
+      const device = devices.find((d: any) => d.id === savedDeviceId);
+
+      if (!device) {
+        console.log('⚠️ Previously paired device not found in browser cache');
+        console.log('   User may need to pair again');
+        // Clear stale localStorage
+        localStorage.removeItem(BLE_DEVICE_ID_KEY);
+        localStorage.removeItem(BLE_DEVICE_NAME_KEY);
+        return false;
+      }
+
+      console.log(`✅ Found previously paired device: ${device.name}`);
+      console.log('🔌 Connecting to GATT server...');
+
+      // Connect to the device
+      const server = await device.gatt.connect();
+      const service = await server.getPrimaryService(BLE_SERVICE_UUID);
+      const characteristic = await service.getCharacteristic(DATA_CHAR_UUID);
+
+      await characteristic.startNotifications();
+
+      // Setup listeners
+      await setupBLEListeners(device, characteristic);
+
+      setSuccess('✅ Auto-reconnected to your Arduino!');
+      setTimeout(() => setSuccess(null), 3000);
+
+      return true;
+    } catch (err: any) {
+      console.error('❌ Auto-reconnect failed:', err);
+
+      // If GATT connection fails, the device might be out of range
+      if (err.message?.includes('GATT')) {
+        console.log('⚠️ Device out of range or not powered on');
+      }
+
+      return false;
+    }
+  };
+
+  /**
    * Connect to IoT Kit via Web Bluetooth API
    */
   const connectBLE = async () => {
     try {
       setError(null);
+
+      // First, try to auto-reconnect to previously paired device
+      const reconnected = await attemptAutoReconnect();
+      if (reconnected) {
+        console.log('✅ Auto-reconnect successful!');
+        return;
+      }
+
+      // Auto-reconnect failed, show device picker for manual pairing
       console.log('🔍 Scanning for EdgeChain IoT Kit devices...');
 
       const BLE_SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
@@ -751,104 +960,8 @@ export function ArduinoDashboard() {
 
       await characteristic.startNotifications();
 
-      // Track if we've registered the device yet
-      let deviceRegistered = false;
-
-      // Listen for sensor readings
-      characteristic.addEventListener('characteristicvaluechanged', async (event: any) => {
-        const buffer = event.target.value.buffer;
-        const reading = parseIoTPayload(buffer);
-
-        console.log('📊 BLE reading received:', {
-          temperature: reading.t,
-          humidity: reading.h,
-          device: reading.device_pubkey?.slice(0, 16) + '...',
-        });
-
-        // Auto-register device on first reading
-        if (!deviceRegistered && reading.device_pubkey) {
-          console.log('🔐 First reading from device, checking registration...');
-          deviceRegistered = await checkAndRegisterDevice(reading.device_pubkey);
-
-          if (!deviceRegistered) {
-            console.error('❌ Failed to register device, skipping reading');
-            return;
-          }
-        }
-
-        // Store reading in local state
-        const sensorReading: SensorData = {
-          timestamp: Date.now(),
-          temperature: reading.t,
-          humidity: reading.h,
-          source: 'iot-kit',
-        };
-
-        setCurrentReading(sensorReading);
-        setSensorData((prev) => [...prev, sensorReading].slice(-1000)); // Keep last 1000
-
-        // Submit reading to backend for real-time reward distribution
-        try {
-          const submitResponse = await fetch(`${API_BASE}/api/arduino/readings/submit`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              device_pubkey: reading.device_pubkey,
-              reading: reading.reading_json,
-              signature: reading.signature,
-              owner_wallet: wallet.address,
-              collection_mode: 'auto',
-            }),
-          });
-
-          const submitResult = await submitResponse.json();
-
-          if (submitResult.success) {
-            console.log('✅ Reading submitted successfully');
-            console.log(`   IPFS CID: ${submitResult.ipfs_cid}`);
-            console.log(`   Reward distributed: ${submitResult.reward_amount} tDUST`);
-            console.log(`   Transaction: ${submitResult.tx_hash || 'pending'}`);
-
-            // Accumulate rewards and show notification every 60 seconds
-            const now = Date.now();
-            const timeSinceLastNotification = now - lastRewardNotification;
-            const newAccumulated = accumulatedRewards + (submitResult.reward_amount || 0);
-            setAccumulatedRewards(newAccumulated);
-
-            // DISABLED: Reward notifications temporarily disabled
-            // Accumulate rewards silently in console logs only
-            console.log(`⏱️  Reward notification (DISABLED):`);
-            console.log(`   Time since last: ${(timeSinceLastNotification / 1000).toFixed(1)}s`);
-            console.log(`   Accumulated: ${newAccumulated.toFixed(2)} tDUST`);
-            console.log(`   Notification: DISABLED (check console for rewards)`);
-
-            // Update accumulator but don't show notification
-            if (timeSinceLastNotification >= 60000) {
-              setLastRewardNotification(now);
-              setAccumulatedRewards(0); // Reset accumulator
-              console.log(`   💰 Total earned in last 60s: ${newAccumulated.toFixed(2)} tDUST (notification disabled)`);
-            }
-
-            // COMMENTED OUT: Annoying notification
-            // if (timeSinceLastNotification >= 60000) { // 60 seconds
-            //   setError(null);
-            //   setSuccess(`🎉 +${newAccumulated.toFixed(2)} tDUST earned! Readings verified & stored on IPFS.`);
-            //   setLastRewardNotification(now);
-            //   setAccumulatedRewards(0); // Reset accumulator
-            //   console.log(`   ✅ SHOWING NOTIFICATION`);
-            //   setTimeout(() => setSuccess(null), 3000);
-            // }
-          } else {
-            console.warn('⚠️ Reading submission failed:', submitResult.error);
-            setError(`Failed to submit reading: ${submitResult.error}`);
-          }
-        } catch (err) {
-          console.error('❌ Failed to submit reading:', err);
-        }
-      });
-
-      setIsCollecting(true);
-      console.log('✓ Connected to IoT Kit, listening for readings...');
+      // Setup listeners using shared logic
+      await setupBLEListeners(device, characteristic);
     } catch (err: any) {
       console.error('BLE connection error:', err);
 
@@ -1117,6 +1230,22 @@ export function ArduinoDashboard() {
               >
                 {wallet.isConnected ? '📡 Connect IoT Kit via BLE' : '⚠️ Connect Wallet First'}
               </button>
+
+              {/* Show "Forget Device" button if a device was previously paired */}
+              {localStorage.getItem(BLE_DEVICE_ID_KEY) && (
+                <button
+                  onClick={() => {
+                    localStorage.removeItem(BLE_DEVICE_ID_KEY);
+                    localStorage.removeItem(BLE_DEVICE_NAME_KEY);
+                    setSuccess('✅ Forgot previously paired device. You can now pair a new device.');
+                    setTimeout(() => setSuccess(null), 3000);
+                  }}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-6 py-2 text-sm font-semibold hover:border-gray-400 hover:cursor-pointer"
+                >
+                  🗑️ Forget Previously Paired Device
+                </button>
+              )}
+
               <p className="text-sm text-gray-600">
                 Need EdgeChain firmware? Download it{' '}
                 <a
@@ -1256,60 +1385,8 @@ export function ArduinoDashboard() {
               </div>
             </details>
 
-            {/* PRIORITY 2 & 3: CONSISTENCY + INCENTIVES */}
+            {/* PRIORITY 2 & 3: INCENTIVES */}
             <div className="grid gap-6 md:grid-cols-1">
-              {/* CONSISTENCY SCORE - HIDDEN */}
-              {/* <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
-                  <span>📊</span> Data Collection Consistency
-                </div>
-
-                <div className="mb-5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold">
-                      {timeSinceActivated > 0 ? ((timeDataCollected / timeSinceActivated) * 100).toFixed(1) : 0}%
-                    </span>
-                    <span className="rounded-full border border-gray-300 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-gray-600">
-                      {timeSinceActivated > 0 && (timeDataCollected / timeSinceActivated) * 100 >= 98 ? 'Excellent' :
-                       timeSinceActivated > 0 && (timeDataCollected / timeSinceActivated) * 100 >= 90 ? 'Good' :
-                       'Needs attention'}
-                    </span>
-                  </div>
-                  <div className="h-2 w-full rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full bg-black transition-all"
-                      style={{ width: `${timeSinceActivated > 0 ? Math.min(100, (timeDataCollected / timeSinceActivated) * 100) : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-
-                <div className="space-y-3 text-sm text-gray-600">
-                  <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <span>Uptime (seconds)</span>
-                    <span className="font-semibold text-black font-mono">
-                      {timeDataCollected}s / {timeSinceActivated}s
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <span>Data collection time</span>
-                    <span className="font-semibold text-black">{timeDataCollected} seconds</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <span>Total time since activated</span>
-                    <span className="font-semibold text-black">{timeSinceActivated} seconds</span>
-                  </div>
-                  <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3">
-                    <span>Reading interval</span>
-                    <span className="font-semibold text-black">30 seconds</span>
-                  </div>
-                  {consistency.perfectDayStreak > 0 && (
-                    <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-600">
-                      {consistency.perfectDayStreak} day{consistency.perfectDayStreak !== 1 ? 's' : ''} perfect streak
-                    </div>
-                  )}
-                </div>
-              </div> */}
-
               {/* tDUST INCENTIVES */}
               <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                 <div className="mb-4 flex items-center gap-2 text-lg font-semibold">
