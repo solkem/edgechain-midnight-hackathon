@@ -18,11 +18,30 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'yarn'
 
-      - name: Install Yarn via npm (bypass Corepack registry issue)
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install Yarn with fallback to GitHub release
         run: |
-          npm install -g yarn@4.9.2
+          set +e
+          echo "Attempting to prepare Yarn via Corepack..."
+          corepack prepare yarn@4.9.2 --activate
+
+          if [ $? -ne 0 ]; then
+            echo "Corepack failed, downloading Yarn from GitHub releases..."
+            mkdir -p ~/.yarn/berry
+            curl -L https://github.com/yarnpkg/berry/raw/%40yarnpkg/cli/4.9.2/packages/yarnpkg-cli/bin/yarn.js -o ~/.yarn/berry/yarn.js
+            chmod +x ~/.yarn/berry/yarn.js
+
+            # Create a wrapper script
+            sudo tee /usr/local/bin/yarn > /dev/null << 'EOFWRAPPER'
+          #!/bin/bash
+          exec node ~/.yarn/berry/yarn.js "$@"
+          EOFWRAPPER
+            sudo chmod +x /usr/local/bin/yarn
+          fi
+
           yarn --version
 
       - name: Install dependencies
