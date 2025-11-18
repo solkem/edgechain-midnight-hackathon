@@ -19,29 +19,24 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Install Yarn with fallback to GitHub release
+      - name: Disable Corepack and install Yarn from GitHub
         run: |
-          set +e
-          echo "Attempting to prepare Yarn via Corepack..."
-          corepack prepare yarn@4.9.2 --activate
+          # Disable Corepack to prevent it from intercepting yarn commands
+          corepack disable
 
-          if [ $? -ne 0 ]; then
-            echo "Corepack failed, downloading Yarn from GitHub releases..."
-            mkdir -p ~/.yarn/berry
-            curl -L https://github.com/yarnpkg/berry/raw/%40yarnpkg/cli/4.9.2/packages/yarnpkg-cli/bin/yarn.js -o ~/.yarn/berry/yarn.js
-            chmod +x ~/.yarn/berry/yarn.js
+          echo "Downloading Yarn 4.9.2 from GitHub releases..."
+          mkdir -p ~/.yarn/berry
+          curl -L https://github.com/yarnpkg/berry/raw/%40yarnpkg/cli/4.9.2/packages/yarnpkg-cli/bin/yarn.js -o ~/.yarn/berry/yarn.js
+          chmod +x ~/.yarn/berry/yarn.js
 
-            # Create a wrapper script
-            sudo tee /usr/local/bin/yarn > /dev/null << 'EOFWRAPPER'
+          # Create a wrapper script that bypasses Corepack
+          sudo tee /usr/local/bin/yarn > /dev/null << 'EOFWRAPPER'
           #!/bin/bash
-          exec node ~/.yarn/berry/yarn.js "$@"
+          exec node "$HOME/.yarn/berry/yarn.js" "$@"
           EOFWRAPPER
-            sudo chmod +x /usr/local/bin/yarn
-          fi
+          sudo chmod +x /usr/local/bin/yarn
 
+          # Verify installation
           yarn --version
 
       - name: Install dependencies
