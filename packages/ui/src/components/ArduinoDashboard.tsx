@@ -186,28 +186,27 @@ export function ArduinoDashboard() {
       return;
     }
 
-    // Calculate total time covered by sensor readings
-    // Assumption: readings are 30 seconds apart, each reading represents 30 seconds of data collection
-    const READING_INTERVAL = 30; // seconds
+    if (sensorData.length === 1) {
+      // Only one reading - can't calculate time yet, assume 0
+      setTimeDataCollected(0);
+      return;
+    }
+
+    // Calculate total time covered by sensor readings (only active periods)
     const GAP_THRESHOLD = 120; // 2 minutes - if gap is longer, device was offline
 
     let totalCollectionTime = 0;
 
-    for (let i = 0; i < sensorData.length; i++) {
-      if (i === 0) {
-        // First reading counts as one interval
-        totalCollectionTime += READING_INTERVAL;
-      } else {
-        const currentTime = sensorData[i].timestamp;
-        const previousTime = sensorData[i - 1].timestamp;
-        const gap = (currentTime - previousTime) / 1000; // Convert to seconds
+    for (let i = 1; i < sensorData.length; i++) {
+      const currentTime = sensorData[i].timestamp;
+      const previousTime = sensorData[i - 1].timestamp;
+      const gap = (currentTime - previousTime) / 1000; // Convert to seconds
 
-        if (gap <= GAP_THRESHOLD) {
-          // Normal reading interval - count it
-          totalCollectionTime += Math.min(gap, READING_INTERVAL);
-        }
-        // If gap > threshold, device was offline - don't count this time
+      if (gap <= GAP_THRESHOLD) {
+        // Normal reading interval - count the actual gap
+        totalCollectionTime += gap;
       }
+      // If gap > threshold, device was offline - don't count this time
     }
 
     setTimeDataCollected(Math.floor(totalCollectionTime));
